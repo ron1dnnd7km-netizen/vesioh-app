@@ -1,22 +1,16 @@
 {
   "name": "sms-virtual-code",
   "version": "1.0.0",
-  "description": "",
-  "main": "server.js",
   "scripts": {
+    "dev": "node server.js",
     "start": "node server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.9.0",
     "cors": "^2.8.6",
+    "cryptomus": "^0.0.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.14"
   }
 }
