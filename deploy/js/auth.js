@@ -130,7 +130,7 @@ async function apiSignup(name, email, password) {
   const res = await fetch('/api/auth/signup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ name, email, password })
   });
   return await res.json();
 }
@@ -161,9 +161,78 @@ function renderLanding() {
         <button class="btn btn-primary" onclick="showSignup()">Sign Up Free</button>
       </div>
     </nav>
+
+    <!-- HERO -->
+    <section style="padding:140px 40px 80px;text-align:center;max-width:800px;margin:0 auto;">
+      <div style="display:inline-block;padding:6px 16px;background:var(--accent-dim);border:1px solid rgba(13,155,122,0.15);border-radius:20px;font-size:12px;font-weight:600;color:var(--accent);margin-bottom:24px;">
+        Trusted by 50,000+ users worldwide
+      </div>
+      <h1 style="font-size:52px;font-weight:700;line-height:1.1;letter-spacing:-2px;margin-bottom:20px;">
+        Receive SMS Codes<br><span style="color:var(--accent);">Instantly</span>
+      </h1>
+      <p style="font-size:18px;color:var(--text-secondary);line-height:1.6;margin-bottom:36px;max-width:560px;margin-left:auto;margin-right:auto;">
+        Get virtual phone numbers for verification codes. Works with WhatsApp, Facebook, Telegram, Google, and 200+ services.
+      </p>
+      <div style="display:flex;gap:12px;justify-content:center;">
+        <button class="btn btn-primary" style="padding:14px 32px;font-size:15px;" onclick="showSignup()">
+          Get Started <i class="fas fa-arrow-right" style="margin-left:4px;"></i>
+        </button>
+        <button class="btn btn-secondary" style="padding:14px 32px;font-size:15px;" onclick="openModal()">
+          Try Demo
+        </button>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin-top:16px;">No credit card required. Create an account to start using the service.</p>
     </section>
 
-   <!-- PRODUCT LIST -->
+    <!-- STATS BAR -->
+    <section style="padding:0 40px 60px;">
+      <div style="max-width:700px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:20px;">
+        <div style="text-align:center;padding:24px;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-sm);">
+          <div style="font-size:32px;font-weight:700;color:var(--accent);letter-spacing:-1px;">200+</div>
+          <div style="font-size:13px;color:var(--text-secondary);margin-top:4px;">Services Supported</div>
+        </div>
+        <div style="text-align:center;padding:24px;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-sm);">
+          <div style="font-size:32px;font-weight:700;color:var(--accent);letter-spacing:-1px;">50+</div>
+          <div style="font-size:13px;color:var(--text-secondary);margin-top:4px;">Countries</div>
+        </div>
+        <div style="text-align:center;padding:24px;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-sm);">
+          <div style="font-size:32px;font-weight:700;color:var(--accent);letter-spacing:-1px;">10s</div>
+          <div style="font-size:13px;color:var(--text-secondary);margin-top:4px;">Avg. Delivery Time</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section id="howItWorks" style="padding:60px 40px;">
+      <div style="max-width:800px;margin:0 auto;">
+        <h2 style="font-size:28px;font-weight:700;text-align:center;letter-spacing:-1px;margin-bottom:40px;">How It Works</h2>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;">
+          <div style="text-align:center;padding:32px 20px;">
+            <div style="width:56px;height:56px;background:var(--accent-dim);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:22px;color:var(--accent);">
+              <i class="fas fa-list"></i>
+            </div>
+            <h3 style="font-size:16px;font-weight:600;margin-bottom:8px;">1. Choose Service</h3>
+            <p style="font-size:13px;color:var(--text-secondary);line-height:1.6;">Pick the service you need a verification code for from 200+ options.</p>
+          </div>
+          <div style="text-align:center;padding:32px 20px;">
+            <div style="width:56px;height:56px;background:var(--accent-dim);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:22px;color:var(--accent);">
+              <i class="fas fa-phone"></i>
+            </div>
+            <h3 style="font-size:16px;font-weight:600;margin-bottom:8px;">2. Get Number</h3>
+            <p style="font-size:13px;color:var(--text-secondary);line-height:1.6;">Receive a virtual phone number instantly. Copy it to the service.</p>
+          </div>
+          <div style="text-align:center;padding:32px 20px;">
+            <div style="width:56px;height:56px;background:var(--accent-dim);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:22px;color:var(--accent);">
+              <i class="fas fa-key"></i>
+            </div>
+            <h3 style="font-size:16px;font-weight:600;margin-bottom:8px;">3. Receive Code</h3>
+            <p style="font-size:13px;color:var(--text-secondary);line-height:1.6;">SMS code appears in your dashboard within seconds. Done.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PRODUCT LIST -->
     <section style="padding:60px 40px;">
       <div style="max-width:900px;margin:0 auto;">
         <h2 style="font-size:28px;font-weight:700;text-align:center;letter-spacing:-1px;margin-bottom:8px;">Available Services</h2>
@@ -266,10 +335,15 @@ function renderSignup() {
     <div style="max-width:400px;margin:120px auto 0;padding:0 20px;">
       <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:36px;box-shadow:var(--shadow-md);">
         <h2 style="font-size:24px;font-weight:700;margin-bottom:6px;">Create account</h2>
-        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:28px;">Use a valid email address when you sign up.</p>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">Use a valid email address and choose a secure password with at least 6 characters.</p>
+        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:28px;">By signing up, you agree to our terms of service and privacy policy.</p>
 
         <div id="signupError" style="display:none;padding:10px 14px;background:rgba(217,48,37,0.06);border:1px solid rgba(217,48,37,0.15);border-radius:10px;font-size:13px;color:var(--danger);margin-bottom:16px;"></div>
 
+        <div style="margin-bottom:18px;">
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Full Name</label>
+          <input type="text" id="signupName" placeholder="John Doe" style="width:100%;padding:11px 14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;color:var(--text-primary);outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+        </div>
 
         <div style="margin-bottom:18px;">
           <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Email</label>
@@ -297,7 +371,7 @@ function renderSignup() {
     </div>
   `;
 
-  setTimeout(() => document.getElementById('signupEmail').focus(), 100);
+  setTimeout(() => document.getElementById('signupName').focus(), 100);
 }
 
 // ====== FORM HANDLERS ======
@@ -322,7 +396,7 @@ async function handleLogin() {
       errorEl.style.display = 'block';
       errorEl.textContent = data.error;
     } else {
-      currentUser = { email: data.email, };
+      currentUser = { email: data.email, name: data.name };
       localStorage.setItem('smsvc_user', JSON.stringify(currentUser));
       showApp();
       showToast('Welcome back, ' + data.name, 'success');
@@ -337,6 +411,7 @@ async function handleLogin() {
 }
 
 async function handleSignup() {
+  const name = document.getElementById('signupName').value.trim();
   const email = document.getElementById('signupEmail').value.trim();
   const password = document.getElementById('signupPassword').value;
   const confirm = document.getElementById('signupConfirm').value;
@@ -368,10 +443,10 @@ async function handleSignup() {
       errorEl.style.display = 'block';
       errorEl.textContent = data.error;
     } else {
-      currentUser = { email: data.email };
+      currentUser = { email: data.email, name: data.name };
       localStorage.setItem('smsvc_user', JSON.stringify(currentUser));
       showApp();
-      showToast('Account created!  success');
+      showToast('Account created! $6.00 credits added.', 'success');
       
       // Open modal with selected service if available
       setTimeout(() => {

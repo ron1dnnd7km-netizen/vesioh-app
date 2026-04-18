@@ -341,6 +341,11 @@ app.get('/api/deposits/:email', (req, res) => {
 
 // ====== START ======
 const PORT = process.env.PORT || 3000;
+
+app.use(function(req, res) {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 app.listen(PORT, () => {
-  console.log('Server running at http://localhost:' + PORT);
+  console.log('Server started on port ' + PORT);
 });

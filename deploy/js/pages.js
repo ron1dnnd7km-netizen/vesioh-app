@@ -136,6 +136,32 @@ function renderHistoryPage(main) {
     '<div class="history-section"><div class="history-list">' + rows + '</div></div>';
 }
 
+function renderPricingPage(main) {
+  var tiers = [
+    { name: 'Starter', price: '5.00', features: ['10 SMS codes', 'Basic services', 'US numbers only', 'Email support'], hl: false },
+    { name: 'Pro', price: '15.00', features: ['50 SMS codes', 'All services', 'Multi-country', 'Priority support', 'API access'], hl: true },
+    { name: 'Business', price: '50.00', features: ['200 SMS codes', 'All services', 'All countries', 'Dedicated support', 'API access', 'Webhooks', 'Bulk orders'], hl: false }
+  ];
+  main.innerHTML = '<div class="page-header"><h1 class="page-title">Pricing Plans</h1></div>' +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:900px;">' +
+    tiers.map(function(t) {
+      var cls = t.hl ? 'stat-card pricing-highlight' : 'stat-card';
+      var titleColor = t.hl ? 'var(--accent)' : 'var(--text-muted)';
+      var valueColor = t.hl ? 'var(--accent)' : 'var(--text-primary)';
+      var btnCls = t.hl ? 'btn btn-primary' : 'btn btn-secondary';
+      var btnText = t.hl ? 'Get Started' : 'Select Plan';
+      var feats = t.features.map(function(f) {
+        return '<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary);"><i class="fas fa-check" style="color:var(--accent);font-size:10px;"></i> ' + f + '</div>';
+      }).join('');
+      return '<div class="' + cls + '" style="padding:28px 24px;">' +
+        '<div style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:' + titleColor + ';font-weight:600;margin-bottom:12px;">' + t.name + '</div>' +
+        '<div style="font-size:36px;font-weight:700;color:' + valueColor + ';letter-spacing:-2px;">$' + t.price + '</div>' +
+        '<div style="font-size:12px;color:var(--text-muted);margin-top:4px;margin-bottom:20px;">credits</div>' +
+        '<div style="display:flex;flex-direction:column;gap:10px;">' + feats + '</div>' +
+        '<button class="' + btnCls + '" style="width:100%;margin-top:24px;justify-content:center;" onclick="showToast(\'Coming soon\',\'info\')">' + btnText + '</button></div>';
+    }).join('') + '</div>';
+}
+
 function renderApiPage(main) {
   main.innerHTML = '<div class="page-header"><h1 class="page-title">API Documentation</h1></div>' +
     '<div class="stat-card" style="max-width:800px;">' +
