@@ -1,5 +1,5 @@
 var SMS_API_KEY = process.env.SMS_API_KEY || 'YOUR_API_KEY_HERE';
-var SMS_PROVIDER = process.env.SMS_PROVIDER || 'sms-activate';
+var SMS_PROVIDER = (process.env.SMS_PROVIDER || 'sms-activate').toLowerCase();
 
 var smsActivate = {
 
@@ -127,13 +127,22 @@ var smsActivate = {
 
 var fiveSim = {
 
-  getNumber: async function(service, country) {
+    getNumber: async function(service, country) {
     try {
       var url = 'https://5sim.net/v1/user/buy/activation/' + country + '/' + service + '/any';
       var response = await fetch(url, {
         headers: { 'Authorization': 'Bearer ' + SMS_API_KEY }
       });
-      var data = await response.json();
+      var text = await response.text(); // Read as text first to prevent crashes
+      
+      let data;
+      try {
+        data = JSON.parse(text); // Try to turn into JSON
+      } catch (e) {
+        // If it fails, 5sim sent plain text like "no free phones"
+        return { success: false, error: text || 'No numbers available. Try a different country.' };
+      }
+
       if (data.id) {
         return { success: true, requestId: String(data.id), phone: data.phone };
       }
@@ -214,8 +223,115 @@ var fiveSim = {
   }
 };
 
+var smsMan = {
+  apiBase: 'https://sms-man.com/api',
+
+  getNumber: async function(service, country) {
+    try {
+      var url = this.apiBase + '/get-sms?apikey=' + SMS_API_KEY + '&service=' + service + '&country=' + country;
+      var response = await fetch(url);
+      var text = String(await response.text());
+      var data = {};
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        return { success: false, error: 'SMS-Man returned an unexpected response: ' + text };
+      }
+
+      if (data.status === 'success' || data.id || data.request_id) {
+        return { success: true, requestId: String(data.id || data.request_id), phone: data.phone || data.number };
+      }
+
+      return { success: false, error: data.error || data.message || 'No numbers available. Try a different country.' };
+    } catch (err) {
+      return { success: false, error: 'Connection failed: ' + err.message };
+    }
+  },
+
+  checkCode: async function(requestId) {
+    try {
+      var url = this.apiBase + '/get-sms-status?apikey=' + SMS_API_KEY + '&id=' + requestId;
+      var response = await fetch(url);
+      var text = String(await response.text());
+      var data = {};
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        if (text.indexOf('STATUS_OK') !== -1) {
+          return { success: true, code: text.split(':')[1] };
+        }
+        return { success: false, waiting: true };
+      }
+
+      if (data.status === 'success' && data.code) {
+        return { success: true, code: data.code };
+      }
+
+      if (data.status === 'waiting' || data.status === 'pending') {
+        return { success: false, waiting: true };
+      }
+
+      return { success: false, waiting: false, error: data.error || text };
+    } catch (err) {
+      return { success: false, waiting: true, error: err.message };
+    }
+  },
+
+  cancel: async function(requestId) {
+    try {
+      var url = this.apiBase + '/set-status?apikey=' + SMS_API_KEY + '&id=' + requestId + '&status=8';
+      var response = await fetch(url);
+      var text = String(await response.text());
+      return text.indexOf('ACCESS_CANCEL') !== -1 || text.indexOf('success') !== -1;
+    } catch (err) {
+      return false;
+    }
+  },
+
+  complete: async function(requestId) {
+    try {
+      var url = this.apiBase + '/set-status?apikey=' + SMS_API_KEY + '&id=' + requestId + '&status=6';
+      await fetch(url);
+      return true;
+    } catch (err) {
+      return false;
+    }
+  },
+
+  getServiceCode: function(serviceName) {
+    var map = {
+      'WhatsApp': 'whatsapp',
+      'Telegram': 'telegram',
+      'Facebook': 'facebook',
+      'Instagram': 'instagram',
+      'Google': 'google',
+      'Twitter / X': 'twitter',
+      'TikTok': 'tiktok',
+      'Discord': 'discord',
+      'Amazon': 'amazon',
+      'Microsoft': 'microsoft'
+    };
+    return map[serviceName] || 'whatsapp';
+  },
+
+  getCountryCode: function(country) {
+    var map = {
+      'US': 'usa',
+      'UK': 'uk',
+      'DE': 'germany',
+      'FR': 'france',
+      'CA': 'canada',
+      'AU': 'australia',
+      'JP': 'japan',
+      'NL': 'netherlands'
+    };
+    return map[country] || 'usa';
+  }
+};
+
 function getProvider() {
   if (SMS_PROVIDER === '5sim') return fiveSim;
+  if (SMS_PROVIDER.indexOf('sms-man') !== -1) return smsMan;
   return smsActivate;
 }
 
