@@ -1,16 +1,5 @@
 [build]
-builder = "NIXPACKS"
+builder = "railpack"
 
-[deploy]
-startCommand = "node server.js"
-healthcheckPath = "/"
-healthcheckTimeout = 300
-restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 10
-
-[build.env]
-NODE_ENV = "production"
-
-[deploy.env]
-NODE_ENV = "production"
-PORT = "8080"
+[build.node]
+version = "22"
