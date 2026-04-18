@@ -208,7 +208,7 @@ var fiveSim = {
     return map[serviceName] || 'whatsapp';
   },
 
-  getCountryCode: function(country) {
+    getCountryCode: function(country) {
     var map = {
       'US': 'usa',
       'UK': 'uk',
@@ -217,11 +217,32 @@ var fiveSim = {
       'CA': 'canada',
       'AU': 'australia',
       'JP': 'japan',
-      'NL': 'netherlands'
+      'NL': 'netherlands',
+      'BJ': 'benin',
+      'SD': 'sudan',
+      'RE': 'reunion',
+      'DZ': 'algeria',
+      'BO': 'bolivia',
+      'ZM': 'zambia',
+      'KZ': 'kazakhstan',
+      'SS': 'south_sudan',
+      'MV': 'maldives',
+      'LK': 'sri_lanka',
+      'ER': 'eritrea',
+      'AM': 'armenia',
+      'IR': 'iran',
+      'KM': 'comoros',
+      'EC': 'ecuador',
+      'LB': 'lebanon',
+      'IL': 'israel',
+      'EG': 'egypt',
+      'RS': 'serbia',
+      'SG': 'singapore',
+      'CN': 'china',
+      'TW': 'taiwan'
     };
-    return map[country] || 'usa';
+    return map[country] || 'india'; // Default to India if not found (India usually has lots of cheap numbers)
   }
-};
 
 var smsMan = {
   apiBase: 'https://sms-man.com/api',
