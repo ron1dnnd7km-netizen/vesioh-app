@@ -50,8 +50,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ====== AUTH: SIGNUP ======
 app.post('/api/auth/signup', (req, res) => {
-  const { name, email, password } = req.body;
-  if (!name || !email || !password) return res.status(400).json({ error: 'All fields are required' });
+    const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'All fields are required' });
   if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
   const existing = db.prepare('SELECT email FROM users WHERE email = ?').get(email);
   if (existing) return res.status(400).json({ error: 'Email already registered' });
