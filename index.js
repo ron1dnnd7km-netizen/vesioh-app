@@ -247,125 +247,98 @@ app.post('/api/simulate/:id', (req, res) => {
   res.json({ message: 'Simulated SMS received', code, phone: num.phone, service: num.service_name });
 });
 
-// ====== CRYPTOMUS SIGN ======
-function cryptomusSign(bodyString, apiKey) {
-  var hmac = crypto.createHmac('sha256', apiKey);
-  hmac.update(bodyString);
-  return hmac.digest('hex');
+// ====== NOWPAYMENTS SIGNATURE VERIFICATION ======
+function sortObjectKeys(obj) {
+  if (typeof obj !== 'object' || obj === null) return obj;
+  if (Array.isArray(obj)) return obj.map(sortObjectKeys);
+  return Object.keys(obj).sort().reduce((acc, key) => {
+    acc[key] = sortObjectKeys(obj[key]);
+    return acc;
+  }, {});
 }
 
-// ====== DEPOSIT ======
+function verifyNowPaymentsSignature(payloadString, signature, ipnSecret) {
+  var hmac = crypto.createHmac('sha512', ipnSecret);
+  hmac.update(payloadString);
+  return hmac.digest('hex') === signature;
+}
+
+// ====== NOWPAYMENTS DEPOSIT (CREATE INVOICE) ======
 app.post('/api/deposit', async (req, res) => {
   const { email, amount, method } = req.body;
-  if (!email || !amount || !method) return res.status(400).json({ error: 'All fields required' });
+  if (!email || !amount) return res.status(400).json({ error: 'All fields required' });
   if (amount < 2) return res.status(400).json({ error: 'Minimum deposit is $2.00' });
   if (amount > 1000) return res.status(400).json({ error: 'Maximum deposit is $1,000.00' });
 
   const reference = 'DEP-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-  db.prepare('INSERT INTO deposits (email, amount, method, status, reference) VALUES (?, ?, ?, ?, ?)').run(email, amount, method, 'pending', reference);
+  db.prepare('INSERT INTO deposits (email, amount, method, status, reference) VALUES (?, ?, ?, ?, ?)').run(email, amount, 'crypto', 'pending', reference);
 
   try {
-    var merchantUuid = process.env.CRYPTOMUS_MERCHANT_UUID;
-    var apiKey = process.env.CRYPTOMUS_API_KEY;
+    var apiKey = process.env.NOWPAYMENTS_API_KEY;
+    var callbackUrl = process.env.FRONTEND_URL + '/api/deposit/nowpayments-callback';
+    var successUrl = process.env.FRONTEND_URL + '/?deposit=success&ref=' + reference;
 
-    // Build body WITH merchant field
-    var bodyObj = {
-      merchant: merchantUuid,
-      amount: String(amount),
-      currency: 'USDT',
-      network: 'tron', // TRC20 network for USDT
-      callback_url: process.env.FRONTEND_URL + '/api/deposit/callback',
-      return_url: process.env.FRONTEND_URL + '/?deposit=success&ref=' + reference,
-      order_id: reference,
-      lifetime: 3600
-    };
-
-    var bodyString = JSON.stringify(bodyObj);
-    var sign = cryptomusSign(bodyString, apiKey);
-
-    console.log('=== CRYPTOMUS DEBUG ===');
-    console.log('Merchant UUID:', merchantUuid);
-    console.log('API Key (first 10):', apiKey ? apiKey.substring(0, 10) + '...' : 'MISSING');
-    console.log('Body string:', bodyString);
-    console.log('Sign:', sign);
-
-    // Add timeout to prevent hanging
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
-    var cryptoResponse = await fetch('https://api.cryptomus.com/v1/payment', {
+    var response = await fetch('https://api.nowpayments.io/v1/invoice', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'sign': sign
+        'x-api-key': apiKey,
+        'Content-Type': 'application/json'
       },
-      body: bodyString,
-      signal: controller.signal
+      body: JSON.stringify({
+        price_amount: String(amount),
+        price_currency: 'usd',
+        order_id: reference,
+        order_description: 'Deposit to Vesioh - ' + email,
+        ipn_callback_url: callbackUrl,
+        success_url: successUrl,
+        cancel_url: process.env.FRONTEND_URL + '/?deposit=failed'
+      })
     });
 
-    clearTimeout(timeoutId);
-
-    var cryptoData = await cryptoResponse.json();
-    console.log('Response:', JSON.stringify(cryptoData));
-    console.log('=== END DEBUG ===');
-
-    if (!cryptoResponse.ok) {
-      throw new Error(`Cryptomus API error: ${cryptoResponse.status} ${cryptoResponse.statusText}`);
-    }
-
-    if (cryptoData.state === 0 && cryptoData.result && cryptoData.result.url) {
-      res.json({
-        success: true,
-        url: cryptoData.result.url,
-        reference: reference,
-        message: 'Redirecting to payment...'
-      });
+    var data = await response.json();
+    if (data.invoice_url) {
+      res.json({ success: true, url: data.invoice_url, reference: reference });
     } else {
-      var errMsg = cryptoData.message || cryptoData.error || JSON.stringify(cryptoData);
       db.prepare('UPDATE deposits SET status = ? WHERE reference = ?').run('failed', reference);
-      res.status(500).json({ error: 'Cryptomus error: ' + errMsg });
+      res.status(500).json({ error: data.message || 'Failed to create payment invoice' });
     }
   } catch (err) {
-    console.error('Cryptomus Error:', err.message);
+    console.error('NowPayments Error:', err.message);
     db.prepare('UPDATE deposits SET status = ? WHERE reference = ?').run('failed', reference);
-
-    // Handle different types of errors
-    if (err.name === 'AbortError') {
-      res.status(500).json({ error: 'Payment request timed out. Please try again.' });
-    } else if (err.message.includes('fetch')) {
-      res.status(500).json({ error: 'Network error connecting to payment service. Please try again.' });
-    } else {
-      res.status(500).json({ error: 'Payment error: ' + err.message });
-    }
+    res.status(500).json({ error: 'Payment error: ' + err.message });
   }
 });
 
-// ====== CRYPTOMUS CALLBACK ======
-app.post('/api/deposit/callback', async (req, res) => {
+// ====== NOWPAYMENTS IPN CALLBACK (AUTOMATIC BALANCE UPDATE) ======
+app.post('/api/deposit/nowpayments-callback', async (req, res) => {
   try {
-    var data = req.body;
-    console.log('Cryptomus callback:', JSON.stringify(data));
-    if (data.status === 'paid' || data.status === 'paid_over') {
-      var reference = data.order_id;
+    var signature = req.headers['x-nowpayments-sig'] || req.body.rpm_sign;
+    var sortedPayload = sortObjectKeys(req.body);
+    var payloadString = JSON.stringify(sortedPayload);
+    var ipnSecret = process.env.NOWPAYMENTS_IPN_SECRET;
+
+    if (!verifyNowPaymentsSignature(payloadString, signature, ipnSecret)) {
+      console.error('NowPayments IPN signature mismatch');
+      return res.status(400).json({ error: 'Invalid signature' });
+    }
+
+    var paymentStatus = req.body.payment_status;
+    var reference = req.body.order_id;
+
+    if (paymentStatus === 'finished' || paymentStatus === 'confirmed') {
       var deposit = db.prepare('SELECT * FROM deposits WHERE reference = ? AND status = ?').get(reference, 'pending');
       if (deposit) {
-        var received = parseFloat(data.payment_amount_usd) || deposit.amount;
+        var received = parseFloat(req.body.actual_paid_amount) || deposit.amount;
         db.prepare('UPDATE deposits SET status = ? WHERE reference = ?').run('completed', reference);
         db.prepare('UPDATE users SET balance = balance + ? WHERE email = ?').run(received, deposit.email);
         console.log('Deposit approved: ' + reference + ' $' + received + ' for ' + deposit.email);
       }
     }
-    res.json({ ok: true });
+    res.json({ status: 'ok' });
   } catch (err) {
-    console.error('Callback error:', err.message);
+    console.error('NowPayments IPN Error:', err.message);
     res.status(500).json({ error: 'Callback failed' });
   }
-});
-
-// ====== GET DEPOSITS ======
-app.get('/api/deposits/:email', (req, res) => {
-  const rows = db.prepare('SELECT * FROM deposits WHERE email = ? ORDER BY created_at DESC').all(req.params.email);
-  res.json(rows);
 });
 
 // ====== START ======
