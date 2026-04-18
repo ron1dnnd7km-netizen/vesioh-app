@@ -50,14 +50,14 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ====== AUTH: SIGNUP ======
 app.post('/api/auth/signup', (req, res) => {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'All fields are required' });
   if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
   const existing = db.prepare('SELECT email FROM users WHERE email = ?').get(email);
   if (existing) return res.status(400).json({ error: 'Email already registered' });
   const hash = bcrypt.hashSync(password, 10);
-  db.prepare('INSERT INTO users (email, name, password, balance) VALUES (?, ?, ?, 6.00)').run(email, name, hash);
-  res.json({ email, name, message: 'Account created. $6.00 credits added.' });
+  db.prepare('INSERT INTO users (email, name, password, balance) VALUES (?, ?, ?, 6.00)').run(email, email, hash);
+  res.json({ email, name: email, message: 'Account created. $6.00 credits added.' });
 });
 
 // ====== AUTH: LOGIN ======
