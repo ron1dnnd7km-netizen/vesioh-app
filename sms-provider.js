@@ -208,40 +208,40 @@ var fiveSim = {
     return map[serviceName] || 'whatsapp';
   },
 
-    getCountryCode: function(country) {
+      getCountryCode: function(country) {
     var map = {
-      'US': 'usa',
-      'UK': 'uk',
-      'DE': 'germany',
-      'FR': 'france',
-      'CA': 'canada',
-      'AU': 'australia',
-      'JP': 'japan',
-      'NL': 'netherlands',
-      'BJ': 'benin',
-      'SD': 'sudan',
-      'RE': 'reunion',
-      'DZ': 'algeria',
-      'BO': 'bolivia',
-      'ZM': 'zambia',
-      'KZ': 'kazakhstan',
-      'SS': 'south_sudan',
-      'MV': 'maldives',
-      'LK': 'sri_lanka',
-      'ER': 'eritrea',
-      'AM': 'armenia',
-      'IR': 'iran',
-      'KM': 'comoros',
-      'EC': 'ecuador',
-      'LB': 'lebanon',
-      'IL': 'israel',
-      'EG': 'egypt',
-      'RS': 'serbia',
-      'SG': 'singapore',
-      'CN': 'china',
-      'TW': 'taiwan'
+      'US': 'us',
+      'UK': 'gb',         
+      'DE': 'de',        
+      'FR': 'fr',         
+      'CA': 'ca',
+      'AU': 'au',
+      'JP': 'jp',
+      'NL': 'nl',
+      'BJ': 'bj',
+      'SD': 'sd',
+      'RE': 're',
+      'DZ': 'dz',
+      'BO': 'bo',
+      'ZM': 'zm',
+      'KZ': 'kz',
+      'SS': 'ss',
+      'MV': 'mv',
+      'LK': 'lk',
+      'ER': 'er',
+      'AM': 'am',
+      'IR': 'ir',
+      'KM': 'km',
+      'EC': 'ec',
+      'LB': 'lb',
+      'IL': 'il',
+      'EG': 'eg',
+      'RS': 'rs',
+      'SG': 'sg',
+      'CN': 'cn',
+      'TW': 'tw'
     };
-    return map[country] || 'india'; // Default to India if not found (India usually has lots of cheap numbers)
+    return map[country] || 'ru'; // Default to Russia (usually has lots of cheap numbers)
   }
 
 var smsMan = {
