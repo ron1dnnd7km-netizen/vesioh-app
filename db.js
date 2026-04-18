@@ -55,6 +55,8 @@ db.exec(`
 // Add name/password columns if they don't exist (for existing databases)
 try { db.exec('ALTER TABLE users ADD COLUMN name TEXT DEFAULT ""'); } catch(e) {}
 try { db.exec('ALTER TABLE users ADD COLUMN password TEXT DEFAULT ""'); } catch(e) {}
+try { db.exec('ALTER TABLE users ADD COLUMN ref_code TEXT'); } catch(e) {}
+try { db.exec('ALTER TABLE users ADD COLUMN referred_by TEXT'); } catch(e) {}
 try { db.exec('ALTER TABLE numbers ADD COLUMN provider_request_id TEXT'); } catch(e) {}
 
 db.exec(`

@@ -17,7 +17,7 @@ function showToast(message, type = 'success') {
 }
 
 function updateBalanceDisplay(amount) {
-  document.getElementById('balanceAmount').textContent = amount.toFixed(2);
+  document.getElementById('balanceAmount').textContent = '$' + amount.toFixed(2);
 }
 
 async function loadBalance() {
@@ -39,6 +39,7 @@ function renderMainContent() {
   else if (currentPage === 'pricing') renderPricingPage(main);
   else if (currentPage === 'api') renderApiPage(main);
   else if (currentPage === 'help') renderHelpPage(main);
+  else if (currentPage === 'settings') renderSettingsPage(main);
   else if (currentPage === 'contacts') renderContactsPage(main);
   else if (currentPage === 'timer') renderTimerPage(main);
   else if (currentPage === 'deposit') {
@@ -173,6 +174,7 @@ showApp = async function() {
   originalShowApp();
   await loadBalance();
   await loadNumbers();
+  currentPage = 'numbers';
   renderMainContent();
   startSimulation();
 };
@@ -211,10 +213,21 @@ document.querySelector('.user-info').addEventListener('click', function() {
   dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
 });
 
+// ====== LANGUAGE MENU ======
+document.querySelector('.language-btn').addEventListener('click', function(e) {
+  e.stopPropagation();
+  const dropdown = document.querySelector('.language-dropdown');
+  dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+});
+
 document.addEventListener('click', function(e) {
   if (!e.target.closest('.user-menu')) {
     const dropdown = document.querySelector('.user-dropdown');
     if (dropdown) dropdown.style.display = 'none';
+  }
+  if (!e.target.closest('.language-menu')) {
+    const langDropdown = document.querySelector('.language-dropdown');
+    if (langDropdown) langDropdown.style.display = 'none';
   }
 });
 

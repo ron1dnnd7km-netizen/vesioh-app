@@ -1,9 +1,15 @@
 let selectedService = null;
 let selectedCountry = null;
 let customServiceName = '';
-let selectedPaymentMethod = 'crypto'; // Default to crypto
+let selectedPaymentMethod = 'wallet'; // Pay from wallet balance
 
 // ====== MODAL MANAGEMENT ======
+
+function openModalById(serviceId) {
+  const service = services.find(s => s.id === serviceId);
+  if (!service) return;
+  openModal(service);
+}
 
 function openModal(presetService = null) {
   const overlay = document.getElementById('modalOverlay');
@@ -63,48 +69,6 @@ function updateModalBody() {
 
     ${selectedService && selectedCountry ? `
       <div class="form-group">
-        <label class="form-label">Payment Method</label>
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          
-          <!-- Card Option -->
-          <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg-primary);border:${selectedPaymentMethod === 'card' ? '2px solid var(--accent)' : '1px solid var(--border)'};border-radius:8px;cursor:pointer;" onclick="selectPaymentMethod('card', this)">
-            <div style="width:20px;height:20px;border-radius:50%;border:2px solid ${selectedPaymentMethod === 'card' ? 'var(--accent)' : 'var(--border)'};display:flex;align-items:center;justify-content:center;">
-              <div style="width:8px;height:8px;border-radius:50%;background:${selectedPaymentMethod === 'card' ? 'var(--accent)' : 'transparent'};"></div>
-            </div>
-            <div><div style="font-size:13px;font-weight:600;">💳 Credit / Debit Card</div><div style="font-size:11px;color:var(--text-muted);">Visa, Mastercard</div></div>
-          </div>
-
-          <!-- Crypto Options Header -->
-          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;font-weight:600;">OR PAY WITH CRYPTO</div>
-
-          <!-- USDT Option -->
-          <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg-primary);border:${selectedPaymentMethod === 'usdt' ? '2px solid var(--accent)' : '1px solid var(--border)'};border-radius:8px;cursor:pointer;" onclick="selectPaymentMethod('usdt', this)">
-            <div style="width:20px;height:20px;border-radius:50%;border:2px solid ${selectedPaymentMethod === 'usdt' ? 'var(--accent)' : 'var(--border)'};display:flex;align-items:center;justify-content:center;">
-              <div style="width:8px;height:8px;border-radius:50%;background:${selectedPaymentMethod === 'usdt' ? 'var(--accent)' : 'transparent'};"></div>
-            </div>
-            <div><div style="font-size:13px;font-weight:600;">USDT (TRC20)</div><div style="font-size:11px;color:var(--text-muted);">Tether - Lowest fees</div></div>
-          </div>
-
-          <!-- BTC Option -->
-          <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg-primary);border:${selectedPaymentMethod === 'btc' ? '2px solid var(--accent)' : '1px solid var(--border)'};border-radius:8px;cursor:pointer;" onclick="selectPaymentMethod('btc', this)">
-            <div style="width:20px;height:20px;border-radius:50%;border:2px solid ${selectedPaymentMethod === 'btc' ? 'var(--accent)' : 'var(--border)'};display:flex;align-items:center;justify-content:center;">
-              <div style="width:8px;height:8px;border-radius:50%;background:${selectedPaymentMethod === 'btc' ? 'var(--accent)' : 'transparent'};"></div>
-            </div>
-            <div><div style="font-size:13px;font-weight:600;">Bitcoin</div><div style="font-size:11px;color:var(--text-muted);">BTC</div></div>
-          </div>
-
-          <!-- ETH Option -->
-          <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg-primary);border:${selectedPaymentMethod === 'eth' ? '2px solid var(--accent)' : '1px solid var(--border)'};border-radius:8px;cursor:pointer;" onclick="selectPaymentMethod('eth', this)">
-            <div style="width:20px;height:20px;border-radius:50%;border:2px solid ${selectedPaymentMethod === 'eth' ? 'var(--accent)' : 'var(--border)'};display:flex;align-items:center;justify-content:center;">
-              <div style="width:8px;height:8px;border-radius:50%;background:${selectedPaymentMethod === 'eth' ? 'var(--accent)' : 'transparent'};"></div>
-            </div>
-            <div><div style="font-size:13px;font-weight:600;">Ethereum</div><div style="font-size:11px;color:var(--text-muted);">ETH</div></div>
-          </div>
-
-        </div>
-      </div>
-      
-      <div class="form-group">
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 16px;">
           <div>
             <div style="font-weight: 600; color: var(--text-primary);">Cost: $${finalPrice.toFixed(2)}</div>
@@ -145,9 +109,9 @@ async function getNumber() {
   modalBody.innerHTML = `
     <div style="text-align: center; padding: 40px 20px;">
       <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: var(--accent); margin-bottom: 16px;"></i>
-      <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">Processing Payment...</div>
+      <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">Charging wallet...</div>
       <div style="font-size: 13px; color: var(--text-muted);">Please wait while we assign your number</div>
-      <div style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">Method: ${selectedPaymentMethod.toUpperCase()} | Cost: $${finalPrice.toFixed(2)}</div>
+      <div style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">Cost: $${finalPrice.toFixed(2)}</div>
     </div>
   `;
 
@@ -164,7 +128,7 @@ async function getNumber() {
         serviceId: serviceId,
         countryCode: selectedCountry.code,
         cost: finalPrice,
-        paymentMethod: selectedPaymentMethod // Send 'card', 'usdt', 'btc', or 'eth'
+        paymentMethod: 'wallet'
       })
     });
     

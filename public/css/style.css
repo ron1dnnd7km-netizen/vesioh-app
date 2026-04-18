@@ -135,15 +135,80 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 14px;
-    background: var(--accent-dim);
-    border: 1px solid rgba(13,155,122,0.15);
-    border-radius: 20px;
+    padding: 8px 16px;
+    background: #f6f7ff;
+    border: 1px solid rgba(29, 52, 94, 0.08);
+    border-radius: 22px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1f2b3d;
+    cursor: pointer;
+  }
+  .balance-badge i { font-size: 14px; color: var(--accent); }
+
+  .language-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid rgba(29, 52, 94, 0.12);
+    background: #ffffff;
+    color: #1f2b3d;
+    border-radius: 16px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+  }
+  .language-btn:hover {
+    background: #f5f7ff;
+    border-color: rgba(29, 52, 94, 0.18);
+  }
+  .language-flag {
+    font-size: 16px;
+  }
+  .language-label {
     font-size: 13px;
     font-weight: 600;
-    color: var(--accent);
   }
-  .balance-badge i { font-size: 12px; }
+
+  .language-menu {
+    position: relative;
+  }
+
+  .language-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow-md);
+    padding: 8px 0;
+    min-width: 140px;
+    display: none;
+    z-index: 200;
+    margin-top: 4px;
+  }
+  .language-dropdown button {
+    width: 100%;
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-primary);
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .language-dropdown button:hover {
+    background: var(--bg-card-hover);
+  }
+  .language-dropdown button span {
+    font-size: 16px;
+  }
 
   .user-menu {
     position: relative;

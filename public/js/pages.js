@@ -1,45 +1,53 @@
 function renderNumbersPage(main) {
-  var filtered = currentFilter === 'all'
-    ? activeNumbers
-    : activeNumbers.filter(function(n) { return n.status === currentFilter; });
-
-  var activeCount = activeNumbers.filter(function(n) { return n.status !== 'expired'; }).length;
-  var waitCount = activeNumbers.filter(function(n) { return n.status === 'waiting'; }).length;
-  var recvCount = activeNumbers.filter(function(n) { return n.status === 'received'; }).length;
-  var expCount = activeNumbers.filter(function(n) { return n.status === 'expired'; }).length;
+  var totalActive = activeNumbers ? activeNumbers.length : 0;
+  var waitingCount = activeNumbers ? activeNumbers.filter(function(n){ return n.status === 'waiting'; }).length : 0;
+  var purchasedSection = totalActive > 0
+    ? '<div style="display:grid;gap:18px;margin-top:18px;">' + activeNumbers.map(renderNumberCard).join('') + '</div>'
+    : '<div style="padding:22px;border:1px dashed var(--border);border-radius:14px;color:var(--text-secondary);font-size:14px;">You have no active numbers yet. Choose a service below to buy your first temporary number.</div>';
 
   main.innerHTML = '<div class="page-header">' +
-    '<h1 class="page-title">Active Numbers</h1>' +
-    '<div class="page-actions">' +
-    '<button class="btn btn-secondary" onclick="refreshAllNumbers()"><i class="fas fa-sync-alt"></i> Refresh</button>' +
-    '<button class="btn btn-primary" onclick="openModal()"><i class="fas fa-plus"></i> Get Number</button>' +
-    '</div></div>' +
-
-    '<div class="stats-grid">' +
-    '<div class="stat-card"><div class="stat-label">Active Numbers</div><div class="stat-value green">' + activeCount + '</div><div class="stat-change up"><i class="fas fa-arrow-up"></i> Real-time</div></div>' +
-    '<div class="stat-card"><div class="stat-label">Waiting for SMS</div><div class="stat-value yellow">' + waitCount + '</div><div class="stat-change up"><i class="fas fa-clock"></i> In progress</div></div>' +
-    '<div class="stat-card"><div class="stat-label">Codes Received</div><div class="stat-value blue">' + recvCount + '</div><div class="stat-change up"><i class="fas fa-check"></i> Today</div></div>' +
-    '<div class="stat-card"><div class="stat-label">Expired</div><div class="stat-value red">' + expCount + '</div><div class="stat-change down"><i class="fas fa-times"></i> Timed out</div></div>' +
+    '<h1 class="page-title">Welcome back to SMS Virtual Code</h1>' +
     '</div>' +
-
-    '<div class="section-header"><div class="section-title">Number List <span class="count-badge">' + filtered.length + '</span></div>' +
-    '<div class="filter-tabs">' +
-    '<button class="filter-tab ' + (currentFilter === 'all' ? 'active' : '') + '" onclick="setFilter(\'all\')">All</button>' +
-    '<button class="filter-tab ' + (currentFilter === 'waiting' ? 'active' : '') + '" onclick="setFilter(\'waiting\')">Waiting</button>' +
-    '<button class="filter-tab ' + (currentFilter === 'received' ? 'active' : '') + '" onclick="setFilter(\'received\')">Received</button>' +
-    '<button class="filter-tab ' + (currentFilter === 'expired' ? 'active' : '') + '" onclick="setFilter(\'expired\')">Expired</button>' +
-    '</div></div>' +
-
-    '<div class="active-numbers">' +
-    (filtered.length === 0
-      ? '<div class="empty-state"><i class="fas fa-inbox"></i><h3>No numbers found</h3><p>Get a new virtual number to receive SMS codes</p></div>'
-      : filtered.map(renderNumberCard).join('')) +
+    '<div class="page-content" style="max-width:980px;margin:0 auto;">' +
+    '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-bottom:28px;">' +
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:22px;box-shadow:var(--shadow-sm);">' +
+        '<h3 style="font-size:16px;font-weight:700;margin-bottom:10px;">Current active numbers</h3>' +
+        '<p style="font-size:28px;font-weight:800;margin:0;">' + totalActive + '</p>' +
+      '</div>' +
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:22px;box-shadow:var(--shadow-sm);">' +
+        '<h3 style="font-size:16px;font-weight:700;margin-bottom:10px;">Waiting for SMS</h3>' +
+        '<p style="font-size:28px;font-weight:800;margin:0;">' + waitingCount + '</p>' +
+      '</div>' +
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:22px;box-shadow:var(--shadow-sm);">' +
+        '<h3 style="font-size:16px;font-weight:700;margin-bottom:10px;">Quick purchase</h3>' +
+        '<p style="font-size:14px;color:var(--text-secondary);line-height:1.75;margin:0;">Select a service below to reserve a new number instantly.</p>' +
+      '</div>' +
     '</div>' +
-
-    '<div style="margin-top:20px;"><div class="section-header"><div class="section-title">Available Services</div></div>' +
-    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">' +
-    getDashboardServiceListHTML() +
-    '</div></div>';
+    '<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:22px;margin-bottom:32px;">' +
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:26px;box-shadow:var(--shadow-sm);">' +
+        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px;">' +
+          '<div>' +
+            '<h2 style="font-size:24px;font-weight:700;margin-bottom:10px;">Buy a temporary number</h2>' +
+            '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin:0;">Choose a verification service below and instantly reserve a temporary SMS number.</p>' +
+          '</div>' +
+          '<button class="btn btn-primary" onclick="document.getElementById(\'serviceSearch\').focus()">Search services</button>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;">' + getDashboardServiceListHTML() + '</div>' +
+      '</div>' +
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:26px;box-shadow:var(--shadow-sm);">' +
+        '<h2 style="font-size:24px;font-weight:700;margin-bottom:14px;">Purchased numbers</h2>' +
+        '<p style="font-size:14px;color:var(--text-secondary);line-height:1.8;margin:0 0 18px;">Your active numbers and verification codes appear here automatically.</p>' +
+        purchasedSection +
+      '</div>' +
+    '</div>' +
+    '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:28px;box-shadow:var(--shadow-sm);">' +
+      '<h2 style="font-size:28px;font-weight:700;margin-bottom:18px;">Why use temporary phone numbers</h2>' +
+      '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin-bottom:20px;">When creating accounts, most websites require a valid mobile number, and typically only one account is allowed per number. Temporary numbers let you create and manage multiple accounts without limitations.</p>' +
+      '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin-bottom:20px;"><strong>Protect your privacy</strong><br>Your personal phone number can reveal sensitive details. Using temporary numbers helps keep your identity and information secure.</p>' +
+      '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin-bottom:20px;"><strong>Avoid scams and unwanted charges</strong><br>Some websites request phone numbers for downloads or access, which may lead to hidden subscriptions or spam. Temporary numbers help you avoid these risks.</p>' +
+      '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;"><strong>Bypass regional restrictions</strong><br>Certain services limit access based on location. Temporary numbers from different countries allow you to register and use platforms without geographic barriers.</p>' +
+    '</div>' +
+    '</div>';
 }
 
 function renderNumberCard(n) {
@@ -92,27 +100,31 @@ function renderNumberCard(n) {
 
 function getDashboardServiceListHTML() {
   var items = [
-    { name: 'WhatsApp', icon: 'fab fa-whatsapp', color: '#25d366', bg: 'rgba(37,211,102,0.1)', price: '0.70', id: 'wa-us' },
-    { name: 'Telegram', icon: 'fab fa-telegram-plane', color: '#24a1de', bg: 'rgba(36,161,222,0.1)', price: '0.45', id: 'tg' },
-    { name: 'Facebook', icon: 'fab fa-facebook-f', color: '#1877f2', bg: 'rgba(24,119,242,0.1)', price: '0.50', id: 'fb-us' },
-    { name: 'Instagram', icon: 'fab fa-instagram', color: '#e1306c', bg: 'rgba(225,48,108,0.1)', price: '0.60', id: 'ig' },
-    { name: 'Google', icon: 'fab fa-google', color: '#4285f4', bg: 'rgba(66,133,244,0.1)', price: '0.35', id: 'google' },
-    { name: 'Twitter / X', icon: 'fab fa-x-twitter', color: '#1da1f2', bg: 'rgba(29,161,242,0.1)', price: '0.55', id: 'twitter' },
-    { name: 'TikTok', icon: 'fab fa-tiktok', color: '#cc0044', bg: 'rgba(255,0,80,0.06)', price: '0.55', id: 'tiktok' },
-    { name: 'Discord', icon: 'fab fa-discord', color: '#5865f2', bg: 'rgba(88,101,242,0.1)', price: '0.40', id: 'discord' },
-    { name: 'Amazon', icon: 'fab fa-amazon', color: '#e68a00', bg: 'rgba(255,153,0,0.1)', price: '0.90', id: 'amazon' },
-    { name: 'Microsoft', icon: 'fab fa-microsoft', color: '#0078d4', bg: 'rgba(0,120,212,0.1)', price: '0.50', id: 'ms' },
-    { name: 'Fiverr', icon: 'fab fa-font-awesome', color: '#00af50', bg: 'rgba(0,175,80,0.1)', price: '0.80', id: 'fiverr' },
-    { name: 'PayPal', icon: 'fab fa-paypal', color: '#003087', bg: 'rgba(0,48,135,0.1)', price: '0.85', id: 'paypal' }
+    { name: 'WhatsApp', icon: 'fab fa-whatsapp', color: '#25d366', bg: 'rgba(37,211,102,0.1)', price: '0.70', id: 'wa-us', country: 'US' },
+    { name: 'Telegram', icon: 'fab fa-telegram-plane', color: '#24a1de', bg: 'rgba(36,161,222,0.1)', price: '0.45', id: 'tg', country: 'US' },
+    { name: 'Facebook', icon: 'fab fa-facebook-f', color: '#1877f2', bg: 'rgba(24,119,242,0.1)', price: '0.50', id: 'fb-us', country: 'US' },
+    { name: 'Instagram', icon: 'fab fa-instagram', color: '#e1306c', bg: 'rgba(225,48,108,0.1)', price: '0.60', id: 'ig', country: 'US' },
+    { name: 'Google', icon: 'fab fa-google', color: '#4285f4', bg: 'rgba(66,133,244,0.1)', price: '0.35', id: 'google', country: 'US' },
+    { name: 'Twitter / X', icon: 'fab fa-x-twitter', color: '#1da1f2', bg: 'rgba(29,161,242,0.1)', price: '0.55', id: 'twitter', country: 'US' },
+    { name: 'TikTok', icon: 'fab fa-tiktok', color: '#cc0044', bg: 'rgba(255,0,80,0.06)', price: '0.55', id: 'tiktok', country: 'US' },
+    { name: 'Discord', icon: 'fab fa-discord', color: '#5865f2', bg: 'rgba(88,101,242,0.1)', price: '0.40', id: 'discord', country: 'US' },
+    { name: 'Amazon', icon: 'fab fa-amazon', color: '#e68a00', bg: 'rgba(255,153,0,0.1)', price: '0.90', id: 'amazon', country: 'US' },
+    { name: 'Microsoft', icon: 'fab fa-microsoft', color: '#0078d4', bg: 'rgba(0,120,212,0.1)', price: '0.50', id: 'ms', country: 'US' },
+    { name: 'Fiverr', icon: 'fab fa-font-awesome', color: '#00af50', bg: 'rgba(0,175,80,0.1)', price: '0.80', id: 'fiverr', country: 'US' },
+    { name: 'PayPal', icon: 'fab fa-paypal', color: '#003087', bg: 'rgba(0,48,135,0.1)', price: '0.85', id: 'paypal', country: 'US' }
   ];
   return items.map(function(s) {
+    var service = services.find(function(x) { return x.id === s.id; }) || {};
+    var availableText = service.available !== undefined ? service.available.toLocaleString() + ' pc' : '';
     return '<div style="padding:16px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;text-align:center;box-shadow:var(--shadow-sm);cursor:pointer;transition:all 0.2s;" ' +
       'onmouseover="this.style.boxShadow=\'var(--shadow-md)\';this.style.borderColor=\'var(--accent)\'" ' +
       'onmouseout="this.style.boxShadow=\'var(--shadow-sm)\';this.style.borderColor=\'var(--border)\'" ' +
-      'onclick="openModal(services.find(function(x){return x.id===\'' + s.id + '\'}))">' +
+      'onclick="openModalById(\'' + s.id + '\')">' +
       '<div style="width:40px;height:40px;border-radius:10px;background:' + s.bg + ';display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:16px;color:' + s.color + ';">' +
       '<i class="' + s.icon + '"></i></div>' +
-      '<div style="font-size:12px;font-weight:600;margin-bottom:4px;">' + s.name + '</div>' +
+      '<div style="font-size:12px;font-weight:600;margin-bottom:6px;">' + s.name + '</div>' +
+      '<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">' + s.region + '</div>' +
+      (availableText ? '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;">' + availableText + '</div>' : '') +
       '<div style="font-size:13px;font-weight:700;color:var(--accent);">$' + s.price + '</div></div>';
   }).join('');
 }
@@ -134,6 +146,65 @@ function renderHistoryPage(main) {
   main.innerHTML = '<div class="page-header"><h1 class="page-title">SMS History</h1>' +
     '<div class="page-actions"><button class="btn btn-secondary" onclick="showToast(\'Export coming soon\',\'info\')"><i class="fas fa-download"></i> Export</button></div></div>' +
     '<div class="history-section"><div class="history-list">' + rows + '</div></div>';
+}
+
+async function renderSettingsPage(main) {
+  main.innerHTML = '<div class="page-header"><h1 class="page-title">Referral Program</h1></div>' +
+    '<div style="max-width:980px;margin:0 auto;display:grid;gap:22px;">' +
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:26px;box-shadow:var(--shadow-sm);">' +
+        '<h2 style="font-size:24px;font-weight:700;margin-bottom:10px;">Recommend the service and earn money</h2>' +
+        '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin-bottom:18px;">Share your referral link with friends and earn 2% of every purchase made by users who sign up through your link.</p>' +
+        '<button class="btn btn-secondary" style="margin-bottom:16px;" onclick="document.querySelectorAll(\'.nav-link\').forEach(function(l){l.classList.remove(\'active\')});document.querySelector(\"[data-page=help]\").classList.add(\'active\');currentPage=\'help\';renderMainContent();">Read more...</button>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;">' +
+        '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
+          '<div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px;">Your balance</div>' +
+          '<div style="font-size:32px;font-weight:800;color:var(--accent);margin-bottom:8px;" id="referralBalance">$0.00</div>' +
+          '<div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">History of balance is available on the History page.</div>' +
+        '</div>' +
+        '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
+          '<div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px;">Your REF code</div>' +
+          '<div style="font-size:14px;color:var(--text-primary);line-height:1.6;margin-bottom:16px;word-break:break-all;" id="referralLink">Loading your referral link...</div>' +
+          '<button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="copyReferralLink()">Copy referral link</button>' +
+        '</div>' +
+      '</div>' +
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
+        '<h3 style="font-size:16px;font-weight:700;margin-bottom:10px;">How it works</h3>' +
+        '<ul style="font-size:14px;color:var(--text-secondary);line-height:1.8;padding-left:18px;margin:0;">' +
+          '<li>You earn 2% of every purchase made by a user who signs up with your referral link.</li>' +
+          '<li>The bonus is automatically added to your balance.</li>' +
+          '<li>Share your referral link on social media, chat, or email to grow your earnings.</li>' +
+        '</ul>' +
+      '</div>' +
+    '</div>';
+
+  try {
+    const res = await fetch(`/api/user/${getUserEmail()}`);
+    if (!res.ok) throw new Error('Unable to load referral data');
+    const data = await res.json();
+    const referralCode = data.refCode || '';
+    const linkEl = document.getElementById('referralLink');
+    const balanceEl = document.getElementById('referralBalance');
+    const url = referralCode ? `${window.location.origin}/?ref=${referralCode}` : 'Referral code unavailable';
+    if (linkEl) {
+      linkEl.textContent = url;
+      linkEl.dataset.link = url;
+    }
+    if (balanceEl) {
+      balanceEl.textContent = `$${(data.balance || 0).toFixed(2)}`;
+    }
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+function copyReferralLink() {
+  const el = document.getElementById('referralLink');
+  if (!el || !el.dataset.link) {
+    showToast('Referral link not ready yet', 'error');
+    return;
+  }
+  navigator.clipboard.writeText(el.dataset.link).then(() => showToast('Referral link copied', 'success')).catch(() => showToast('Failed to copy', 'error'));
 }
 
 function renderApiPage(main) {

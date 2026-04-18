@@ -43,14 +43,6 @@ function generatePhone(prefix) {
   return `${prefix} ${Math.floor(Math.random()*900+100)} ${Math.floor(Math.random()*900+100)} ${Math.floor(Math.random()*9000+1000)}`;
 }
 
-function generateReferralCode() {
-  let code;
-  do {
-    code = crypto.randomBytes(4).toString('hex');
-  } while (db.prepare('SELECT email FROM users WHERE ref_code = ?').get(code));
-  return code;
-}
-
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -58,17 +50,14 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ====== AUTH: SIGNUP ======
 app.post('/api/auth/signup', (req, res) => {
-  const { email, password, referral } = req.body;
+  const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'All fields are required' });
   if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
   const existing = db.prepare('SELECT email FROM users WHERE email = ?').get(email);
   if (existing) return res.status(400).json({ error: 'Email already registered' });
-  const referrer = referral ? db.prepare('SELECT email FROM users WHERE ref_code = ?').get(referral) : null;
-  const refCode = generateReferralCode();
   const hash = bcrypt.hashSync(password, 10);
-  db.prepare('INSERT INTO users (email, password, balance, ref_code, referred_by) VALUES (?, ?, 6.00, ?, ?)')
-    .run(email, hash, refCode, referrer ? referrer.email : null);
-  res.json({ email, refCode, message: 'Account created. $6.00 credits added.' });
+  db.prepare('INSERT INTO users (email, password, balance) VALUES (?, ?, 6.00)').run(email, hash);
+  res.json({ email, message: 'Account created. $6.00 credits added.' });
 });
 
 // ====== AUTH: LOGIN ======
@@ -93,9 +82,9 @@ app.post('/api/auth/forgot-password', (req, res) => {
 
 // ====== GET USER BALANCE ======
 app.get('/api/user/:email', (req, res) => {
-  const user = db.prepare('SELECT balance, name, ref_code FROM users WHERE email = ?').get(req.params.email);
+  const user = db.prepare('SELECT balance FROM users WHERE email = ?').get(req.params.email);
   if (!user) return res.status(404).json({ error: 'User not found' });
-  res.json({ balance: user.balance, name: user.name, refCode: user.ref_code || null });
+  res.json({ balance: user.balance });
 });
 
 // ====== ADD BALANCE ======
@@ -116,7 +105,7 @@ app.get('/api/numbers/:email', (req, res) => {
 // ====== REQUEST NEW NUMBER ======
 app.post('/api/numbers/request', async (req, res) => {
   const { email, serviceName, serviceId, countryCode, cost } = req.body;
-  const user = db.prepare('SELECT balance, referred_by FROM users WHERE email = ?').get(email);
+  const user = db.prepare('SELECT balance FROM users WHERE email = ?').get(email);
   if (!user) return res.status(404).json({ error: 'User not found' });
   if (user.balance < cost) return res.status(400).json({ error: 'Insufficient balance' });
 
@@ -129,11 +118,8 @@ app.post('/api/numbers/request', async (req, res) => {
       const provider = require('./sms-provider');
       const serviceCode = provider.getServiceCode(serviceName);
       const countryCodeForProvider = provider.getCountryCode(countryCode);
-           const result = await provider.getNumber(serviceCode, countryCodeForProvider);
-      if (!result.success || !result.phone) {
-        const errorMsg = (typeof result === 'string') ? result : (result.error || result.message || 'No numbers available. Try a different country.');
-        return res.status(400).json({ error: errorMsg });
-      }
+      const result = await provider.getNumber(serviceCode, countryCodeForProvider);
+      if (!result.success) return res.status(400).json({ error: result.error || 'No numbers available. Try a different country.' });
       realPhone = result.phone;
       providerRequestId = result.requestId;
     } catch (err) {
@@ -148,12 +134,6 @@ app.post('/api/numbers/request', async (req, res) => {
   }
 
   db.prepare('UPDATE users SET balance = balance - ? WHERE email = ?').run(cost, email);
-  if (user.referred_by) {
-    const referralBonus = parseFloat((cost * 0.02).toFixed(2));
-    if (referralBonus > 0) {
-      db.prepare('UPDATE users SET balance = balance + ? WHERE email = ?').run(referralBonus, user.referred_by);
-    }
-  }
   const insertResult = db.prepare(
     'INSERT INTO numbers (email, service_name, service_id, phone, status, time_left, total_time, cost, provider_request_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
   ).run(email, serviceName, serviceId, realPhone, 'waiting', 1200, 1200, cost, providerRequestId);

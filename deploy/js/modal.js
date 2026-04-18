@@ -1,7 +1,13 @@
 let selectedService = null;
 let selectedCountry = null;
 let customServiceName = '';
-let selectedPaymentMethod = 'usdt';
+let selectedPaymentMethod = 'wallet';
+
+function openModalById(serviceId) {
+  const service = services.find(s => s.id === serviceId);
+  if (!service) return;
+  openModal(service);
+}
 
 function openModal(presetService = null) {
   const overlay = document.getElementById('modalOverlay');
@@ -70,9 +76,9 @@ async function autoGetNumber() {
   modalBody.innerHTML = `
     <div style="text-align: center; padding: 40px 20px;">
       <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: var(--accent); margin-bottom: 16px;"></i>
-      <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">Getting your number...</div>
+      <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">Charging wallet...</div>
       <div style="font-size: 13px; color: var(--text-muted);">Please wait while we assign a virtual number</div>
-      <div style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">Payment: ${selectedPaymentMethod.toUpperCase()} | Cost: $${finalPrice.toFixed(2)}</div>
+      <div style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">Cost: $${finalPrice.toFixed(2)}</div>
     </div>
   `;
 
@@ -90,7 +96,7 @@ async function autoGetNumber() {
         serviceId: serviceId,
         countryCode: selectedCountry.code,
         cost: finalPrice,
-        paymentMethod: selectedPaymentMethod
+        paymentMethod: 'wallet'
       })
     });
     const data = await res.json();
