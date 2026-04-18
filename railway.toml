@@ -3,3 +3,8 @@ builder = "railpack"
 
 [build.node]
 version = "22"
+
+[deploy]
+startCommand = "node index.js"
+healthcheckPath = "/"
+healthcheckPort = 3000
