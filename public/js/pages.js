@@ -258,7 +258,7 @@ function renderContactsPage(main) {
 
 var selectedDepositAmount = 20;
 var selectedPaymentMethod = 'usdt';
-var selectedCryptoCurrency = 'usdttrc20';
+var selectedCryptoCurrency = 'trx';
 
 var depositMethodInfo = {
   usdt: {
@@ -456,6 +456,10 @@ function updateDepositPayButton() {
 }
 
 async function processDeposit() {
+  if (selectedCryptoCurrency === 'usdttrc20' && selectedDepositAmount < 15) {
+    showToast('Minimum for USDT TRC20 is $13.00', 'error');
+    return;
+  }
   if (selectedDepositAmount < 2) {
     showToast('Minimum deposit is $2.00', 'error');
     return;
