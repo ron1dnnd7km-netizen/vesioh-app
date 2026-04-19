@@ -1186,3 +1186,49 @@
       transition-duration: 0.01ms !important;
     }
   }
+
+  /* ===== MOBILE RESPONSIVE FIXES ===== */
+@media (max-width: 768px) {
+  /* 1. Force all grids from pages.js to stack into 1 column on mobile */
+  [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* 2. Hide the desktop navigation links on mobile */
+  .nav-links {
+    display: none !important;
+  }
+
+  /* 3. Make the sidebar slide in from the left */
+  .sidebar {
+    position: fixed !important;
+    left: -100% !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: 85% !important;
+    max-width: 300px !important;
+    z-index: 1000 !important;
+    background: var(--bg-primary) !important;
+    border-right: 1px solid var(--border) !important;
+    transition: left 0.3s ease !important;
+    overflow-y: auto !important;
+  }
+
+  /* 4. Show sidebar when active */
+  .sidebar.active {
+    left: 0 !important;
+  }
+
+  /* 5. Reduce padding so things fit on small screens */
+  .main-content {
+    padding: 15px !important;
+  }
+  .stat-card, .number-card, .history-item {
+    padding: 16px !important;
+  }
+  
+  /* 6. Make buttons full width on mobile */
+  .dep-amt, .dep-meth {
+    flex: 1 0 40% !important;
+  }
+}

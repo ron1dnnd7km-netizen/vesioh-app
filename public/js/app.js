@@ -308,3 +308,22 @@ loadNumbers = async function() {
 };
 
 checkSession();
+
+// Mobile Sidebar Toggle
+document.addEventListener('DOMContentLoaded', function() {
+  var hamburger = document.getElementById('hamburger');
+  var sidebar = document.querySelector('.sidebar');
+  
+  if (hamburger && sidebar) {
+    hamburger.addEventListener('click', function() {
+      sidebar.classList.toggle('active');
+    });
+
+    // Close sidebar when clicking outside of it on mobile
+    document.addEventListener('click', function(event) {
+      if (window.innerWidth <= 768 && !sidebar.contains(event.target) && !hamburger.contains(event.target)) {
+        sidebar.classList.remove('active');
+      }
+    });
+  }
+});
