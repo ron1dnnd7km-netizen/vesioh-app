@@ -1,2 +1,4 @@
 node_modules/
 .env
+smsvirtual.db
+smsvirtual.db-journal
