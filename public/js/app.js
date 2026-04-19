@@ -165,7 +165,7 @@ setInterval(async () => {
   }
 }, 5000);
 
-// ====== CHECK IF RETURNING FROM NOWPAYMENTS PAYMENT ======
+// ====== CHECK IF RETURNING FROM PLISIO PAYMENT ======
 function checkDepositReturn() {
   var params = new URLSearchParams(window.location.search);
   var depositStatus = params.get('deposit');

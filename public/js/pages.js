@@ -318,7 +318,7 @@ function getCryptoPickerHTML() {
     }).join('') +
     '</div>' +
     '<div style="margin-top:10px;font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:6px;">' +
-    '<i class="fas fa-shield-alt" style="color:var(--accent);"></i> Payments processed securely by <strong>NowPayments.io</strong></div>' +
+    '<i class="fas fa-shield-alt" style="color:var(--accent);"></i> Payments processed securely by <strong>Plisio.net</strong></div>' +
     '</div>';
 }
 
@@ -463,7 +463,7 @@ async function processDeposit() {
     };
 
     if (selectedPaymentMethod === 'crypto') {
-      endpoint = '/api/deposit/nowpayments';
+      endpoint = '/api/deposit/crypto';
       payload.pay_currency = selectedCryptoCurrency;
       delete payload.method;
     }

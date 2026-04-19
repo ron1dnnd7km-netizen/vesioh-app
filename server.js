@@ -146,7 +146,7 @@ async function createPlisioInvoice(amount, currency, reference, email) {
 }
 
 // ====== DEPOSIT: CRYPTO ======
-app.post('/api/deposit/nowpayments', async function(req, res) {
+app.post('/api/deposit/crypto', async function(req, res) {
   var email = req.body.email;
   var amount = req.body.amount;
   var payCurrency = req.body.pay_currency || 'TRX';
@@ -332,8 +332,6 @@ app.use(function(req, res) {
 var PORT = process.env.PORT || 3000;
 var server = app.listen(PORT, function() {
   console.log('Server started on port ' + PORT);
-  console.log('NowPayments API Key:', process.env.NOWPAYMENTS_API_KEY ? 'SET' : 'MISSING');
-  console.log('NowPayments IPN Secret:', process.env.NOWPAYMENTS_IPN_SECRET ? 'SET' : 'MISSING');
   console.log('Frontend URL:', process.env.FRONTEND_URL || 'MISSING');
 });
 

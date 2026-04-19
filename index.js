@@ -247,23 +247,43 @@ app.post('/api/simulate/:id', (req, res) => {
   res.json({ message: 'Simulated SMS received', code, phone: num.phone, service: num.service_name });
 });
 
-// ====== NOWPAYMENTS SIGNATURE VERIFICATION ======
-function sortObjectKeys(obj) {
-  if (typeof obj !== 'object' || obj === null) return obj;
-  if (Array.isArray(obj)) return obj.map(sortObjectKeys);
-  return Object.keys(obj).sort().reduce((acc, key) => {
-    acc[key] = sortObjectKeys(obj[key]);
-    return acc;
-  }, {});
+// ====== PLISIO HELPER ======
+async function createPlisioInvoice(amount, currency, reference, email) {
+  var apiKey = process.env.PLISIO_SECRET_KEY;
+  if (!apiKey) throw new Error('Plisio API key not configured in .env');
+
+  var body = {
+    source_currency: 'USD',
+    source_amount: amount,
+    order_number: reference,
+    order_name: 'SMS Virtual Code deposit - ' + email,
+    cancel_url: process.env.FRONTEND_URL + '/?deposit=failed',
+    success_url: process.env.FRONTEND_URL + '/?deposit=success&ref=' + reference,
+    callback_url: process.env.FRONTEND_URL + '/api/deposit/plisio-callback',
+    email: email
+  };
+
+  if (currency) {
+    body.currency = currency;
+  }
+
+  var response = await fetch('https://plisio.net/api/v1/invoices/new', {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/json',
+      'Plisio-API-Key': apiKey 
+    },
+    body: JSON.stringify(body)
+  });
+
+  var data = await response.json();
+  if (data.status !== 'success') {
+    throw new Error(data.err_msg || 'Plisio error');
+  }
+  return data.data;
 }
 
-function verifyNowPaymentsSignature(payloadString, signature, ipnSecret) {
-  var hmac = crypto.createHmac('sha512', ipnSecret);
-  hmac.update(payloadString);
-  return hmac.digest('hex') === signature;
-}
-
-// ====== NOWPAYMENTS DEPOSIT (CREATE INVOICE) ======
+// ====== DEPOSIT ======
 app.post('/api/deposit', async (req, res) => {
   const { email, amount, method } = req.body;
   if (!email || !amount) return res.status(400).json({ error: 'All fields required' });
@@ -271,73 +291,42 @@ app.post('/api/deposit', async (req, res) => {
   if (amount > 1000) return res.status(400).json({ error: 'Maximum deposit is $1,000.00' });
 
   const reference = 'DEP-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-  db.prepare('INSERT INTO deposits (email, amount, method, status, reference) VALUES (?, ?, ?, ?, ?)').run(email, amount, 'crypto', 'pending', reference);
+  db.prepare('INSERT INTO deposits (email, amount, method, status, reference) VALUES (?, ?, ?, ?, ?)').run(email, amount, method || 'crypto', 'pending', reference);
 
   try {
-    var apiKey = process.env.NOWPAYMENTS_API_KEY;
-    var callbackUrl = process.env.FRONTEND_URL + '/api/deposit/nowpayments-callback';
-    var successUrl = process.env.FRONTEND_URL + '/?deposit=success&ref=' + reference;
-
-    var response = await fetch('https://api.nowpayments.io/v1/invoice', {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        price_amount: String(amount),
-        price_currency: 'usd',
-        order_id: reference,
-        order_description: 'Deposit to Vesioh - ' + email,
-        ipn_callback_url: callbackUrl,
-        success_url: successUrl,
-        cancel_url: process.env.FRONTEND_URL + '/?deposit=failed'
-      })
-    });
-
-    var data = await response.json();
-    if (data.invoice_url) {
-      res.json({ success: true, url: data.invoice_url, reference: reference });
-    } else {
-      db.prepare('UPDATE deposits SET status = ? WHERE reference = ?').run('failed', reference);
-      res.status(500).json({ error: data.message || 'Failed to create payment invoice' });
-    }
+    var result = await createPlisioInvoice(amount, null, reference, email);
+    res.json({ success: true, url: result.invoice_url, reference: reference });
   } catch (err) {
-    console.error('NowPayments Error:', err.message);
+    console.error('Plisio Error:', err.message);
     db.prepare('UPDATE deposits SET status = ? WHERE reference = ?').run('failed', reference);
     res.status(500).json({ error: 'Payment error: ' + err.message });
   }
 });
 
-// ====== NOWPAYMENTS IPN CALLBACK (AUTOMATIC BALANCE UPDATE) ======
-app.post('/api/deposit/nowpayments-callback', async (req, res) => {
+// ====== PLISIO CALLBACK ======
+app.post('/api/deposit/plisio-callback', function(req, res) {
   try {
-    var signature = req.headers['x-nowpayments-sig'] || req.body.rpm_sign;
-    var sortedPayload = sortObjectKeys(req.body);
-    var payloadString = JSON.stringify(sortedPayload);
-    var ipnSecret = process.env.NOWPAYMENTS_IPN_SECRET;
+    var status = req.body.status;
+    var orderId = req.body.order_number;
 
-    if (!verifyNowPaymentsSignature(payloadString, signature, ipnSecret)) {
-      console.error('NowPayments IPN signature mismatch');
-      return res.status(400).json({ error: 'Invalid signature' });
-    }
+    console.log('Plisio callback: status=' + status + ' order=' + orderId);
 
-    var paymentStatus = req.body.payment_status;
-    var reference = req.body.order_id;
-
-    if (paymentStatus === 'finished' || paymentStatus === 'confirmed') {
-      var deposit = db.prepare('SELECT * FROM deposits WHERE reference = ? AND status = ?').get(reference, 'pending');
+    if (status === 'completed') {
+      var deposit = db.prepare('SELECT * FROM deposits WHERE reference = ? AND status = ?').get(orderId, 'pending');
       if (deposit) {
-        var received = parseFloat(req.body.actual_paid_amount) || deposit.amount;
-        db.prepare('UPDATE deposits SET status = ? WHERE reference = ?').run('completed', reference);
-        db.prepare('UPDATE users SET balance = balance + ? WHERE email = ?').run(received, deposit.email);
-        console.log('Deposit approved: ' + reference + ' $' + received + ' for ' + deposit.email);
+        var creditAmount = parseFloat(req.body.source_amount) || deposit.amount;
+        db.prepare('UPDATE deposits SET status = ? WHERE reference = ?').run('completed', orderId);
+        db.prepare('UPDATE users SET balance = balance + ? WHERE email = ?').run(creditAmount, deposit.email);
+        console.log('Credited: ' + orderId + ' $' + creditAmount + ' -> ' + deposit.email);
       }
+    } else if (status === 'expired' || status === 'cancelled') {
+      db.prepare('UPDATE deposits SET status = ? WHERE reference = ? AND status = ?').run('failed', orderId, 'pending');
     }
+
     res.json({ status: 'ok' });
   } catch (err) {
-    console.error('NowPayments IPN Error:', err.message);
-    res.status(500).json({ error: 'Callback failed' });
+    console.error('Callback error:', err.message);
+    res.status(200).json({ status: 'ok' });
   }
 });
 

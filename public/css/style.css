@@ -1189,17 +1189,40 @@
 
   /* ===== MOBILE RESPONSIVE FIXES ===== */
 @media (max-width: 768px) {
-  /* 1. Force all grids from pages.js to stack into 1 column on mobile */
-  [style*="grid-template-columns"] {
+  /* 1. Force the main app layout to stack vertically */
+  .main-layout {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  /* 2. Make main content take full width */
+  .main-content {
+    width: 100% !important;
+    margin-left: 0 !important;
+    padding: 15px !important;
+  }
+
+  /* 3. Fix the 3 stat boxes (Active, Waiting, Quick) */
+  div[style*="repeat(3,minmax"] {
     grid-template-columns: 1fr !important;
   }
 
-  /* 2. Hide the desktop navigation links on mobile */
+  /* 4. Fix the Buy Number / Purchased Numbers side-by-side */
+  div[style*="1.5fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* 5. Fix the service icons grid (WhatsApp, Telegram, etc) to be 2 per row */
+  div[style*="repeat(auto-fit,minmax(150px"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* 6. Hide desktop nav links on mobile */
   .nav-links {
     display: none !important;
   }
 
-  /* 3. Make the sidebar slide in from the left */
+  /* 7. Sidebar slide-in */
   .sidebar {
     position: fixed !important;
     left: -100% !important;
@@ -1214,21 +1237,17 @@
     overflow-y: auto !important;
   }
 
-  /* 4. Show sidebar when active */
   .sidebar.active {
     left: 0 !important;
   }
 
-  /* 5. Reduce padding so things fit on small screens */
-  .main-content {
-    padding: 15px !important;
+  /* 8. Hide long email text in top nav to save space */
+  .user-email {
+    display: none !important;
   }
-  .stat-card, .number-card, .history-item {
-    padding: 16px !important;
-  }
-  
-  /* 6. Make buttons full width on mobile */
-  .dep-amt, .dep-meth {
+
+  /* 9. Make buttons stack nicely */
+  .dep-amt {
     flex: 1 0 40% !important;
   }
 }
