@@ -1,7 +1,7 @@
 let selectedService = null;
 let selectedCountry = null;
 let customServiceName = '';
-let selectedPaymentMethod = 'wallet'; // Pay from wallet balance
+let modalPaymentMethod = 'wallet'; // Renamed: was colliding with pages.js
 
 // ====== MODAL MANAGEMENT ======
 
@@ -16,7 +16,7 @@ function openModal(presetService = null) {
   selectedService = presetService || null;
   selectedCountry = presetService ? countries.find(c => c.code === presetService.country) : null;
   customServiceName = '';
-  selectedPaymentMethod = 'crypto'; // Reset to default
+  modalPaymentMethod = 'wallet';
 
   updateModalBody();
   overlay.classList.add('show');
@@ -27,7 +27,6 @@ function updateModalBody() {
   const countryPrice = selectedCountry ? (selectedCountry.basePrice || 0.50) : 0;
   const finalPrice = selectedCountry && selectedService ? countryPrice : 0;
 
-  // Build Service Dropdown
   const uniqueServices = [];
   const seen = new Set();
   services.forEach(s => {
@@ -37,12 +36,10 @@ function updateModalBody() {
     `<option value="${s.id}" ${selectedService && selectedService.id === s.id ? 'selected' : ''}>${s.name}</option>`
   ).join('');
 
-  // Build Country Dropdown
   const countryOptions = countries.map(c => 
     `<option value="${c.code}" ${selectedCountry && selectedCountry.code === c.code ? 'selected' : ''}>${c.flag} ${c.name}</option>`
   ).join('');
 
-  // Show custom input if "Any other" is selected
   const showCustomInput = selectedService && selectedService.id === 'any-other';
   const canGetNumber = selectedService && selectedCountry && (selectedService.id !== 'any-other' || customServiceName.trim().length > 0);
 
@@ -93,8 +90,7 @@ function closeModal() {
 }
 
 function selectPaymentMethod(method, element) {
-  selectedPaymentMethod = method;
-  // Re-render the modal body to update the UI borders/colors
+  modalPaymentMethod = method;
   updateModalBody();
 }
 
@@ -112,7 +108,6 @@ async function getNumber() {
   const countryPrice = selectedCountry.basePrice || 0.50;
   const finalPrice = countryPrice;
 
-  // Show loading state
   modalBody.innerHTML = `
     <div style="text-align: center; padding: 40px 20px;">
       <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: var(--accent); margin-bottom: 16px;"></i>
@@ -135,7 +130,7 @@ async function getNumber() {
         serviceId: serviceId,
         countryCode: selectedCountry.code,
         cost: finalPrice,
-        paymentMethod: 'wallet'
+        paymentMethod: modalPaymentMethod
       })
     });
     
@@ -147,7 +142,6 @@ async function getNumber() {
       return;
     }
 
-    // Success screen
     modalBody.innerHTML = `
       <div style="text-align: center; padding: 40px 20px;">
         <i class="fas fa-check-circle" style="font-size: 48px; color: var(--accent); margin-bottom: 16px;"></i>
@@ -260,7 +254,7 @@ function renderTimerPage(main) {
       <div class="number-info" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; margin-bottom: 30px;">
         <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">${timer.serviceName}</div>
         <div style="font-size: 24px; font-weight: 700; color: var(--accent); margin-bottom: 16px;">${timer.phone}</div>
-        <div style="font-size: 14px; color: var(--text-muted);">Send SMS to this number to receive verification codes</div>
+        <div style="font-size: 14px; color: var(--text-muted);">Send SMS to this number to receive verification codes.</div>
       </div>
 
       <div class="timer-actions" style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
@@ -277,9 +271,9 @@ function renderTimerPage(main) {
 
       <div class="timer-notifications" style="margin-top: 30px; padding: 20px; background: var(--bg-secondary); border-radius: 12px;">
         <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Notifications</h3>
-        <div id="timerNotifications" style="font-size: 14px; color: var(--text-muted);">
-          Waiting for SMS code... You'll be notified when it arrives.
-        </div>
+        <div id="timerNotifications" style="font-size: 14px; color: var(--text-muted);">' +
+          'Waiting for SMS code... You\'ll be notified when it arrives.' +
+        '</div>
       </div>
     </div>
   `;
@@ -352,7 +346,7 @@ function timerExpired() {
 }
 
 
-// ====== EVENT DELEGATION (Fixes the dropdown bug) ======
+// ====== EVENT DELEGATION ======
 
 document.querySelector('.modal-body').addEventListener('change', function(e) {
   if (e.target.id === 'modalService') {

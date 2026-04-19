@@ -164,8 +164,7 @@ app.post('/api/deposit', async function(req, res) {
     return res.status(400).json({ error: 'Card payments coming soon. Use USDT or Cryptocurrency.' });
   }
 
-  var payCurrency = 'usdttrc20';
-  if (method === 'crypto' && pay_currency) payCurrency = pay_currency;
+  var payCurrency = req.body.pay_currency || 'usdttrc20';
   
   db.prepare('INSERT INTO deposits (email, amount, method, status, reference, pay_currency) VALUES (?, ?, ?, ?, ?, ?)').run(email, amount, method, 'pending', reference, payCurrency);
 
