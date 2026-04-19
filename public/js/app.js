@@ -165,7 +165,7 @@ setInterval(async () => {
   }
 }, 5000);
 
-// ====== CHECK IF RETURNING FROM CRYPTOMUS PAYMENT ======
+// ====== CHECK IF RETURNING FROM NOWPAYMENTS PAYMENT ======
 function checkDepositReturn() {
   var params = new URLSearchParams(window.location.search);
   var depositStatus = params.get('deposit');
@@ -244,7 +244,6 @@ function changeLanguage(lang) {
   currentLang = lang;
   localStorage.setItem('language', lang);
 
-  // Update the language button in the top right
   const langBtn = document.querySelector('.language-btn');
   if (langBtn) {
     const flagMap = { en: '🇬🇧', zh: '🇨🇳', ru: '🇷🇺' };
@@ -252,7 +251,6 @@ function changeLanguage(lang) {
     langBtn.innerHTML = `<span class="language-flag">${flagMap[lang]}</span><span class="language-label">${labelMap[lang]}</span><i class="fas fa-chevron-down"></i>`;
   }
 
-  // Update the dropdown options
   const langDropdown = document.querySelector('.language-dropdown');
   if (langDropdown) {
     langDropdown.innerHTML = `
@@ -262,14 +260,12 @@ function changeLanguage(lang) {
     `;
   }
 
-  // Change all text on the screen to the selected language
   applyTranslations();
 
   showToast(`${translations[currentLang]['Language changed to']} ${translations[currentLang][lang === 'en' ? 'English' : lang === 'zh' ? 'Chinese' : 'Russian']}`, 'info');
 }
 
 function applyTranslations() {
-  // Translate navigation, buttons, labels, headings, etc.
   document.querySelectorAll('.nav-link, button, label, h1, h2, h3, h4, h5, h6, .sidebar-title, .modal-title, .form-label').forEach(el => {
     const text = el.textContent.trim();
     if (translations[currentLang][text]) {
@@ -277,7 +273,6 @@ function applyTranslations() {
     }
   });
 
-  // Translate input placeholders
   document.querySelectorAll('input[placeholder]').forEach(input => {
     const placeholder = input.getAttribute('placeholder');
     if (translations[currentLang][placeholder]) {
@@ -285,7 +280,6 @@ function applyTranslations() {
     }
   });
 
-  // Translate dropdown options
   document.querySelectorAll('option').forEach(option => {
     const text = option.textContent.trim();
     if (translations[currentLang][text]) {
@@ -294,7 +288,6 @@ function applyTranslations() {
   });
 }
 
-// Apply language as soon as the page loads
 document.addEventListener('DOMContentLoaded', function() {
   changeLanguage(currentLang);
 });
@@ -314,5 +307,4 @@ loadNumbers = async function() {
   await originalLoadNumbers();
 };
 
-// Start the app
 checkSession();

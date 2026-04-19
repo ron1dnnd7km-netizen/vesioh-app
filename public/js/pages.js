@@ -254,7 +254,7 @@ function renderContactsPage(main) {
     '</div>';
 }
 
-/* ===== Deposit / Add Funds ===== */
+/* ===== DEPOSIT / ADD FUNDS (renamed to avoid collision with modal.js) ===== */
 
 var selectedDepositAmount = 20;
 var selectedPaymentMethod = 'usdt';
@@ -306,7 +306,7 @@ function selectCryptoCurrency(currencyId, el) {
   el.style.background = 'var(--accent-dim)';
   el.style.borderColor = 'var(--accent)';
   el.style.color = 'var(--accent)';
-  updatePayButton();
+  updateDepositPayButton();
 }
 
 function getCryptoPickerHTML() {
@@ -333,17 +333,17 @@ function renderDepositPage(main) {
     '<div class="stat-card" style="padding:24px;min-height:180px;">' +
     '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;"><div style="width:44px;height:44px;border-radius:14px;background:rgba(0,200,150,0.1);display:flex;align-items:center;justify-content:center;color:var(--accent);"><i class="fas fa-money-bill-wave" style="font-size:18px;"></i></div><div><div style="font-size:16px;font-weight:700;">USDT</div><div style="font-size:13px;color:var(--text-muted);">Confirmation: 5-10 minutes</div></div></div>' +
     '<div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">Use USDT TRC20 to top up quickly with low fees and near-instant confirmation.</div>' +
-    '<div style="margin-top:18px;"><button class="btn btn-outline dep-meth" data-method="usdt" onclick="selectPaymentMethod(\'usdt\', this)" style="width:100%;padding:12px;font-size:14px;">Select</button></div>' +
+    '<div style="margin-top:18px;"><button class="btn btn-outline dep-meth" data-method="usdt" onclick="selectDepositMethod(\'usdt\', this)" style="width:100%;padding:12px;font-size:14px;">Select</button></div>' +
     '</div>' +
     '<div class="stat-card" style="padding:24px;min-height:180px;">' +
     '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;"><div style="width:44px;height:44px;border-radius:14px;background:rgba(0,175,193,0.1);display:flex;align-items:center;justify-content:center;color:#00afc1;"><i class="fas fa-credit-card" style="font-size:18px;"></i></div><div><div style="font-size:16px;font-weight:700;">Bank Cards</div><div style="font-size:13px;color:var(--text-muted);">Confirmation: 1-5 minutes</div></div></div>' +
     '<div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">Pay with cards and get balance instantly. Perfect when you need a smooth, simple checkout.</div>' +
-    '<div style="margin-top:18px;"><button class="btn btn-outline dep-meth" data-method="stripe" onclick="selectPaymentMethod(\'stripe\', this)" style="width:100%;padding:12px;font-size:14px;">Select</button></div>' +
+    '<div style="margin-top:18px;"><button class="btn btn-outline dep-meth" data-method="stripe" onclick="selectDepositMethod(\'stripe\', this)" style="width:100%;padding:12px;font-size:14px;">Select</button></div>' +
     '</div>' +
     '<div class="stat-card" style="padding:24px;min-height:180px;">' +
     '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;"><div style="width:44px;height:44px;border-radius:14px;background:rgba(247,147,26,0.1);display:flex;align-items:center;justify-content:center;color:#f7931a;"><i class="fas fa-coins" style="font-size:18px;"></i></div><div><div style="font-size:16px;font-weight:700;">Cryptocurrency</div><div style="font-size:13px;color:var(--text-muted);">Secure crypto payment</div></div></div>' +
     '<div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">Pay with USDT and crypto options through our secure gateway.</div>' +
-    '<div style="margin-top:18px;"><button class="btn btn-outline dep-meth" data-method="crypto" onclick="selectPaymentMethod(\'crypto\', this)" style="width:100%;padding:12px;font-size:14px;">Select</button></div>' +
+    '<div style="margin-top:18px;"><button class="btn btn-outline dep-meth" data-method="crypto" onclick="selectDepositMethod(\'crypto\', this)" style="width:100%;padding:12px;font-size:14px;">Select</button></div>' +
     '</div>' +
     '</div>' +
     '<div class="stat-card" style="padding:24px;">' +
@@ -386,7 +386,7 @@ function updateDepositDetails() {
   if (subtitleEl) subtitleEl.textContent = method.subtitle;
   if (feeNote) feeNote.textContent = method.fee;
   if (hintNote) hintNote.textContent = method.note;
-  updatePayButton();
+  updateDepositPayButton();
 }
 
 function selectDepositAmount(amount, el) {
@@ -401,7 +401,7 @@ function selectDepositAmount(amount, el) {
   el.style.background = 'var(--accent-dim)';
   el.style.border = '2px solid var(--accent)';
   el.dataset.sel = '1';
-  updatePayButton();
+  updateDepositPayButton();
 }
 
 function selectCustomAmount(value) {
@@ -413,11 +413,11 @@ function selectCustomAmount(value) {
       btn.style.border = '1px solid var(--border)';
       delete btn.dataset.sel;
     });
-    updatePayButton();
+    updateDepositPayButton();
   }
 }
 
-function selectPaymentMethod(method, el) {
+function selectDepositMethod(method, el) {
   selectedPaymentMethod = method;
   document.querySelectorAll('.dep-meth').forEach(function(opt) {
     opt.style.background = 'var(--bg-primary)';
@@ -427,10 +427,24 @@ function selectPaymentMethod(method, el) {
   el.style.background = 'var(--accent-dim)';
   el.style.border = '2px solid var(--accent)';
   el.dataset.sel = '1';
-  renderDepositPage(document.getElementById('mainContent'));
+  updateDepositDetails();
+  var existingPicker = document.getElementById('cryptoPicker');
+  if (method === 'crypto') {
+    if (!existingPicker) {
+      var amountInput = document.getElementById('customAmount');
+      if (amountInput) {
+        var temp = document.createElement('div');
+        temp.innerHTML = getCryptoPickerHTML();
+        amountInput.parentNode.insertBefore(temp.firstElementChild, amountInput.parentNode.firstChild);
+      }
+    }
+  } else {
+    if (existingPicker) existingPicker.remove();
+  }
+  updateDepositPayButton();
 }
 
-function updatePayButton() {
+function updateDepositPayButton() {
   var btn = document.getElementById('depositPayBtn');
   if (btn) {
     var label = 'Pay';
@@ -452,24 +466,29 @@ async function processDeposit() {
   btn.disabled = true;
 
   try {
-    var res = await fetch('/api/deposit', {
+    var endpoint = '/api/deposit';
+    var payload = {
+      email: getUserEmail(),
+      amount: selectedDepositAmount,
+      method: selectedPaymentMethod
+    };
+
+    if (selectedPaymentMethod === 'crypto') {
+      endpoint = '/api/deposit/nowpayments';
+      payload.pay_currency = selectedCryptoCurrency;
+      delete payload.method;
+    }
+
+    var res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: getUserEmail(),
-        amount: selectedDepositAmount,
-        method: selectedPaymentMethod
-      })
+      body: JSON.stringify(payload)
     });
     var data = await res.json();
     if (data.error) {
       showToast(data.error, 'error');
-    } else if (data.url) {
-      window.location.href = data.url;
-    } else if (data.success) {
-      if (data.balance !== undefined) updateBalanceDisplay(data.balance);
-      loadDepositHistory();
-      showToast(data.message || 'Deposit completed successfully', 'success');
+    } else if (data.url || data.invoice_url) {
+      window.location.href = data.url || data.invoice_url;
     } else {
       showToast('Unexpected response', 'error');
     }
