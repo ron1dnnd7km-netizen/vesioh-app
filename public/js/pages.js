@@ -482,7 +482,7 @@ async function processDeposit() {
       showToast('Unexpected response', 'error');
     }
   } catch (err) {
-    showToast('Connection error. Try again.', 'error');
+        showToast('Error: ' + err.message, 'error');
   }
 
   btn.innerHTML = '<i class="fas fa-lock" style="font-size:13px;"></i> Pay $' + selectedDepositAmount.toFixed(2) + ' Securely';
