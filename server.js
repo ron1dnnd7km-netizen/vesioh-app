@@ -74,7 +74,7 @@ app.post('/api/auth/signup', function(req, res) {
   var existing = db.prepare('SELECT email FROM users WHERE email = ?').get(email);
   if (existing) return res.status(400).json({ error: 'Email already registered' });
   var hash = bcrypt.hashSync(password, 10);
-  db.prepare('INSERT INTO users (email, password, balance) VALUES (?, ?, 6.00)').run(email, hash);
+  db.prepare('INSERT INTO users (email, password, balance) VALUES (?, ?, 0.00)').run(email, hash);
   res.json({ email: email, message: 'Account created. $6.00 credits added.' });
 });
 
