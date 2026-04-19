@@ -377,9 +377,15 @@ app.use(function(req, res) {
 
 // ====== START ======
 var PORT = process.env.PORT || 3000;
-app.listen(PORT, function() {
+var server = app.listen(PORT, function() {
   console.log('Server started on port ' + PORT);
   console.log('NowPayments API Key:', process.env.NOWPAYMENTS_API_KEY ? 'SET' : 'MISSING');
   console.log('NowPayments IPN Secret:', process.env.NOWPAYMENTS_IPN_SECRET ? 'SET' : 'MISSING');
   console.log('Frontend URL:', process.env.FRONTEND_URL || 'MISSING');
+});
+
+// Fix Railway proxy crashing the server
+server.on('clientError', function(err, socket) {
+  if (err.code === 'HPE_INVALID_CONSTANT') return socket.destroy();
+  socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
 });
