@@ -287,7 +287,6 @@ var cryptoOptions = [
   { id: 'eth', name: 'Ethereum' },
   { id: 'ltc', name: 'Litecoin' },
   { id: 'doge', name: 'Dogecoin' },
-  { id: 'bnb', name: 'BNB' },
   { id: 'matic', name: 'Polygon' },
   { id: 'trx', name: 'TRON' },
   { id: 'sol', name: 'Solana' },
@@ -513,7 +512,6 @@ async function loadDepositHistory() {
     container.innerHTML = deposits.map(function(d) {
       var statusColor = d.status === 'completed' ? 'var(--accent)' : d.status === 'pending' ? 'var(--warning)' : 'var(--danger)';
       var statusText = d.status === 'completed' ? 'Completed' : d.status === 'pending' ? 'Pending' : 'Failed';
-      var methodLabels = { usdt: 'USDT', btc: 'BTC', eth: 'ETH', ltc: 'LTC', doge: 'DOGE', bnb: 'BNB', sol: 'SOL', xrp: 'XRP', stripe: 'Card', usdc: 'USDC', matic: 'MATIC', ada: 'ADA', trx: 'TRX', usdttrc20: 'USDT TRC20' };
       var methodLabel = methodLabels[d.method] || methodLabels[d.pay_currency] || d.method || 'Unknown';
       var date = new Date(d.created_at);
       var timeStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
