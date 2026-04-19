@@ -109,82 +109,49 @@ app.post('/api/user/:email/balance', function(req, res) {
   res.json({ balance: user.balance });
 });
 
-// ====== NOWPAYMENTS HELPER ======
-async function createNowInvoice(amount, payCurrency, reference, email) {
-  var apiKey = process.env.NOWPAYMENTS_API_KEY;
-  if (!apiKey) throw new Error('NowPayments API key not configured in .env');
+// ====== PLISIO HELPER ======
+async function createPlisioInvoice(amount, currency, reference, email) {
+  var apiKey = process.env.PLISIO_SECRET_KEY;
+  if (!apiKey) throw new Error('Plisio API key not configured in .env');
 
   var body = {
-    price_amount: amount,
-    price_currency: 'usd',
-    pay_currency: payCurrency,
-    order_id: reference,
-    order_description: 'SMS Virtual Code deposit - ' + email,
-    ipn_callback_url: process.env.FRONTEND_URL + '/api/deposit/nowpayments-callback',
+    source_currency: 'USD',
+    source_amount: amount,
+    order_number: reference,
+    order_name: 'SMS Virtual Code deposit - ' + email,
+    cancel_url: process.env.FRONTEND_URL + '/?deposit=failed',
     success_url: process.env.FRONTEND_URL + '/?deposit=success&ref=' + reference,
-    cancel_url: process.env.FRONTEND_URL + '/?deposit=failed'
+    callback_url: process.env.FRONTEND_URL + '/api/deposit/plisio-callback',
+    email: email
   };
 
-  var controller = new AbortController();
-  var timer = setTimeout(function() { controller.abort(); }, 30000);
+  if (currency) {
+    body.currency = currency;
+  }
 
-  var response = await fetch('https://api.nowpayments.io/v1/invoice', {
+  var response = await fetch('https://plisio.net/api/v1/invoices/new', {
     method: 'POST',
-    headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: controller.signal
+    headers: { 
+      'Content-Type': 'application/json',
+      'Plisio-API-Key': apiKey 
+    },
+    body: JSON.stringify(body)
   });
 
-  clearTimeout(timer);
   var data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || 'NowPayments error ' + response.status);
+  if (data.status !== 'success') {
+    throw new Error(data.err_msg || 'Plisio error');
   }
-  if (!data.invoice_url) {
-    throw new Error(data.message || 'No invoice URL returned');
-  }
-  return data;
+  return data.data;
 }
 
-// ====== DEPOSIT: USDT & CARDS ======
-app.post('/api/deposit', async function(req, res) {
-  var email = req.body.email;
-  var amount = req.body.amount;
-  var method = req.body.method;
-
-  if (!email || !amount) return res.status(400).json({ error: 'All fields required' });
-  if (amount < 2) return res.status(400).json({ error: 'Minimum deposit is $2.00' });
-  if (amount > 1000) return res.status(400).json({ error: 'Maximum deposit is $1,000.00' });
-
-  var reference = 'DEP-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-
-  if (method === 'stripe') {
-    db.prepare('INSERT INTO deposits (email, amount, method, status, reference) VALUES (?, ?, ?, ?, ?)').run(email, amount, 'stripe', 'failed', reference);
-    return res.status(400).json({ error: 'Card payments coming soon. Use USDT or Cryptocurrency.' });
-  }
-
-  var payCurrency = req.body.pay_currency || 'usdttrc20';
-  
-  db.prepare('INSERT INTO deposits (email, amount, method, status, reference, pay_currency) VALUES (?, ?, ?, ?, ?, ?)').run(email, amount, method, 'pending', reference, payCurrency);
-
-  try {
-    var result = await createNowInvoice(amount, payCurrency, reference, email);
-    res.json({ success: true, url: result.invoice_url, reference: reference });
-  } catch (err) {
-    console.error('Deposit error:', err.message);
-    db.prepare('UPDATE deposits SET status = ? WHERE reference = ?').run('failed', reference);
-    res.status(500).json({ error: 'Payment error: ' + err.message });
-  }
-});
-
-// ====== DEPOSIT: CRYPTO PICKER ======
+// ====== DEPOSIT: CRYPTO ======
 app.post('/api/deposit/nowpayments', async function(req, res) {
   var email = req.body.email;
   var amount = req.body.amount;
-  var payCurrency = req.body.pay_currency;
+  var payCurrency = req.body.pay_currency || 'TRX';
 
-  if (!email || !amount || !payCurrency) return res.status(400).json({ error: 'All fields required' });
+  if (!email || !amount) return res.status(400).json({ error: 'All fields required' });
   if (amount < 2) return res.status(400).json({ error: 'Minimum deposit is $2.00' });
   if (amount > 1000) return res.status(400).json({ error: 'Maximum deposit is $1,000.00' });
 
@@ -192,7 +159,7 @@ app.post('/api/deposit/nowpayments', async function(req, res) {
   db.prepare('INSERT INTO deposits (email, amount, method, status, reference, pay_currency) VALUES (?, ?, ?, ?, ?, ?)').run(email, amount, 'crypto', 'pending', reference, payCurrency);
 
   try {
-    var result = await createNowInvoice(amount, payCurrency, reference, email);
+    var result = await createPlisioInvoice(amount, payCurrency, reference, email);
     res.json({ success: true, invoice_url: result.invoice_url, reference: reference });
   } catch (err) {
     console.error('Crypto deposit error:', err.message);
@@ -201,38 +168,23 @@ app.post('/api/deposit/nowpayments', async function(req, res) {
   }
 });
 
-// ====== NOWPAYMENTS CALLBACK ======
-app.post('/api/deposit/nowpayments-callback', function(req, res) {
+// ====== PLISIO CALLBACK ======
+app.post('/api/deposit/plisio-callback', function(req, res) {
   try {
-    var signature = req.headers['x-nowpayments-sig'] || '';
-    var ipnSecret = process.env.NOWPAYMENTS_IPN_SECRET;
+    var status = req.body.status;
+    var orderId = req.body.order_number;
 
-    if (ipnSecret && signature) {
-      var sorted = sortObjectKeys(req.body);
-      var payloadStr = JSON.stringify(sorted);
-      var hmac = crypto.createHmac('sha512', ipnSecret);
-      hmac.update(payloadStr);
-      var calculated = hmac.digest('hex');
-      if (calculated.toLowerCase() !== signature.toLowerCase()) {
-        console.error('NowPayments callback: bad signature');
-        return res.status(400).json({ error: 'Invalid signature' });
-      }
-    }
+    console.log('Plisio callback: status=' + status + ' order=' + orderId);
 
-    var status = req.body.payment_status;
-    var orderId = req.body.order_id;
-
-    console.log('NowPayments callback: status=' + status + ' order=' + orderId);
-
-    if (status === 'finished' || status === 'confirmed') {
+    if (status === 'completed') {
       var deposit = db.prepare('SELECT * FROM deposits WHERE reference = ? AND status = ?').get(orderId, 'pending');
       if (deposit) {
-        var creditAmount = parseFloat(req.body.price_amount) || deposit.amount;
+        var creditAmount = parseFloat(req.body.source_amount) || deposit.amount;
         db.prepare('UPDATE deposits SET status = ? WHERE reference = ?').run('completed', orderId);
         db.prepare('UPDATE users SET balance = balance + ? WHERE email = ?').run(creditAmount, deposit.email);
         console.log('Credited: ' + orderId + ' $' + creditAmount + ' -> ' + deposit.email);
       }
-    } else if (status === 'failed' || status === 'expired' || status === 'reversed') {
+    } else if (status === 'expired' || status === 'cancelled') {
       db.prepare('UPDATE deposits SET status = ? WHERE reference = ? AND status = ?').run('failed', orderId, 'pending');
     }
 
@@ -242,6 +194,7 @@ app.post('/api/deposit/nowpayments-callback', function(req, res) {
     res.status(200).json({ status: 'ok' });
   }
 });
+
 
 // ====== NUMBERS ======
 app.get('/api/numbers/:email', function(req, res) {
