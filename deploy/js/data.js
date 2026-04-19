@@ -74,13 +74,8 @@ const services = [
   { id: 'google', name: 'Google', region: 'United States', country: 'US', icon: 'fab fa-google', iconClass: 'google', price: 0.35, category: 'ecommerce' },
 ];
 
-services.forEach((service, index) => {
-  if (service.available === undefined) {
-    service.available = 10579 - ((index * 73) % 5000);
-  }
-});
-
-// ====== EDIT COUNTRIES HERE =====nconst countries = [
+// ====== EDIT COUNTRIES HERE ======
+const countries = [
   { code: 'US', name: 'United States', flag: '🇺🇸', prefix: '+1', basePrice: 0.50 },
   { code: 'UK', name: 'United Kingdom', flag: '🇬🇧', prefix: '+44', basePrice: 0.65 },
   { code: 'DE', name: 'Germany', flag: '🇩🇪', prefix: '+49', basePrice: 0.60 },

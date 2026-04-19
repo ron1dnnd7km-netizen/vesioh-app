@@ -44,6 +44,7 @@ function updateModalBody() {
 
   // Show custom input if "Any other" is selected
   const showCustomInput = selectedService && selectedService.id === 'any-other';
+  const canGetNumber = selectedService && selectedCountry && (selectedService.id !== 'any-other' || customServiceName.trim().length > 0);
 
   modalBody.innerHTML = `
     <div class="form-group">
@@ -74,7 +75,7 @@ function updateModalBody() {
             <div style="font-weight: 600; color: var(--text-primary);">Cost: $${finalPrice.toFixed(2)}</div>
             <div style="font-size: 12px; color: var(--text-muted);">${selectedService.name} in ${selectedCountry.name}</div>
           </div>
-          <button class="btn btn-primary" id="getNumberBtn" onclick="getNumber()">
+          <button class="btn btn-primary" id="getNumberBtn" onclick="getNumber()" ${!canGetNumber ? 'disabled' : ''}>
             <i class="fas fa-plus"></i> Get Number
           </button>
         </div>
@@ -101,6 +102,12 @@ function selectPaymentMethod(method, element) {
 // ====== API ACTIONS ======
 
 async function getNumber() {
+  if (!selectedService || !selectedCountry || (selectedService.id === 'any-other' && !customServiceName.trim())) {
+    showToast('Please select a service, country and service name', 'error');
+    updateModalBody();
+    return;
+  }
+
   const modalBody = document.querySelector('.modal-body');
   const countryPrice = selectedCountry.basePrice || 0.50;
   const finalPrice = countryPrice;
@@ -116,8 +123,8 @@ async function getNumber() {
   `;
 
   try {
-    const serviceName = selectedService.id === 'any-other' && customServiceName ? customServiceName : selectedService.name;
-    const serviceId = selectedService.id === 'any-other' && customServiceName ? `custom-${Date.now()}` : selectedService.id;
+    const serviceName = selectedService.id === 'any-other' ? customServiceName.trim() : selectedService.name;
+    const serviceId = selectedService.id === 'any-other' ? `custom-${Date.now()}` : selectedService.id;
 
     const res = await fetch('/api/numbers/request', {
       method: 'POST',

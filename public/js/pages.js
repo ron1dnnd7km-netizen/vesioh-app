@@ -100,18 +100,18 @@ function renderNumberCard(n) {
 
 function getDashboardServiceListHTML() {
   var items = [
-    { name: 'WhatsApp', icon: 'fab fa-whatsapp', color: '#25d366', bg: 'rgba(37,211,102,0.1)', price: '0.70', id: 'wa-us', country: 'US' },
-    { name: 'Telegram', icon: 'fab fa-telegram-plane', color: '#24a1de', bg: 'rgba(36,161,222,0.1)', price: '0.45', id: 'tg', country: 'US' },
-    { name: 'Facebook', icon: 'fab fa-facebook-f', color: '#1877f2', bg: 'rgba(24,119,242,0.1)', price: '0.50', id: 'fb-us', country: 'US' },
-    { name: 'Instagram', icon: 'fab fa-instagram', color: '#e1306c', bg: 'rgba(225,48,108,0.1)', price: '0.60', id: 'ig', country: 'US' },
-    { name: 'Google', icon: 'fab fa-google', color: '#4285f4', bg: 'rgba(66,133,244,0.1)', price: '0.35', id: 'google', country: 'US' },
-    { name: 'Twitter / X', icon: 'fab fa-x-twitter', color: '#1da1f2', bg: 'rgba(29,161,242,0.1)', price: '0.55', id: 'twitter', country: 'US' },
-    { name: 'TikTok', icon: 'fab fa-tiktok', color: '#cc0044', bg: 'rgba(255,0,80,0.06)', price: '0.55', id: 'tiktok', country: 'US' },
-    { name: 'Discord', icon: 'fab fa-discord', color: '#5865f2', bg: 'rgba(88,101,242,0.1)', price: '0.40', id: 'discord', country: 'US' },
-    { name: 'Amazon', icon: 'fab fa-amazon', color: '#e68a00', bg: 'rgba(255,153,0,0.1)', price: '0.90', id: 'amazon', country: 'US' },
-    { name: 'Microsoft', icon: 'fab fa-microsoft', color: '#0078d4', bg: 'rgba(0,120,212,0.1)', price: '0.50', id: 'ms', country: 'US' },
-    { name: 'Fiverr', icon: 'fab fa-font-awesome', color: '#00af50', bg: 'rgba(0,175,80,0.1)', price: '0.80', id: 'fiverr', country: 'US' },
-    { name: 'PayPal', icon: 'fab fa-paypal', color: '#003087', bg: 'rgba(0,48,135,0.1)', price: '0.85', id: 'paypal', country: 'US' }
+    { name: 'WhatsApp', icon: 'fab fa-whatsapp', color: '#25d366', bg: 'rgba(37,211,102,0.1)', price: '0.70', id: 'wa-us', region: 'US' },
+    { name: 'Telegram', icon: 'fab fa-telegram-plane', color: '#24a1de', bg: 'rgba(36,161,222,0.1)', price: '0.45', id: 'tg', region: 'US' },
+    { name: 'Facebook', icon: 'fab fa-facebook-f', color: '#1877f2', bg: 'rgba(24,119,242,0.1)', price: '0.50', id: 'fb-us', region: 'US' },
+    { name: 'Instagram', icon: 'fab fa-instagram', color: '#e1306c', bg: 'rgba(225,48,108,0.1)', price: '0.60', id: 'ig', region: 'US' },
+    { name: 'Google', icon: 'fab fa-google', color: '#4285f4', bg: 'rgba(66,133,244,0.1)', price: '0.35', id: 'google', region: 'US' },
+    { name: 'Twitter / X', icon: 'fab fa-x-twitter', color: '#1da1f2', bg: 'rgba(29,161,242,0.1)', price: '0.55', id: 'twitter', region: 'US' },
+    { name: 'TikTok', icon: 'fab fa-tiktok', color: '#cc0044', bg: 'rgba(255,0,80,0.06)', price: '0.55', id: 'tiktok', region: 'US' },
+    { name: 'Discord', icon: 'fab fa-discord', color: '#5865f2', bg: 'rgba(88,101,242,0.1)', price: '0.40', id: 'discord', region: 'US' },
+    { name: 'Amazon', icon: 'fab fa-amazon', color: '#e68a00', bg: 'rgba(255,153,0,0.1)', price: '0.90', id: 'amazon', region: 'US' },
+    { name: 'Microsoft', icon: 'fab fa-microsoft', color: '#0078d4', bg: 'rgba(0,120,212,0.1)', price: '0.50', id: 'ms', region: 'US' },
+    { name: 'Fiverr', icon: 'fab fa-font-awesome', color: '#00af50', bg: 'rgba(0,175,80,0.1)', price: '0.80', id: 'fiverr', region: 'US' },
+    { name: 'PayPal', icon: 'fab fa-paypal', color: '#003087', bg: 'rgba(0,48,135,0.1)', price: '0.85', id: 'paypal', region: 'US' }
   ];
   return items.map(function(s) {
     var service = services.find(function(x) { return x.id === s.id; }) || {};
@@ -179,19 +179,19 @@ async function renderSettingsPage(main) {
     '</div>';
 
   try {
-    const res = await fetch(`/api/user/${getUserEmail()}`);
+    const res = await fetch('/api/user/' + getUserEmail());
     if (!res.ok) throw new Error('Unable to load referral data');
     const data = await res.json();
     const referralCode = data.refCode || '';
     const linkEl = document.getElementById('referralLink');
     const balanceEl = document.getElementById('referralBalance');
-    const url = referralCode ? `${window.location.origin}/?ref=${referralCode}` : 'Referral code unavailable';
+    const url = referralCode ? window.location.origin + '/?ref=' + referralCode : 'Referral code unavailable';
     if (linkEl) {
       linkEl.textContent = url;
       linkEl.dataset.link = url;
     }
     if (balanceEl) {
-      balanceEl.textContent = `$${(data.balance || 0).toFixed(2)}`;
+      balanceEl.textContent = '$' + (data.balance || 0).toFixed(2);
     }
   } catch (err) {
     showToast(err.message, 'error');
@@ -204,7 +204,7 @@ function copyReferralLink() {
     showToast('Referral link not ready yet', 'error');
     return;
   }
-  navigator.clipboard.writeText(el.dataset.link).then(() => showToast('Referral link copied', 'success')).catch(() => showToast('Failed to copy', 'error'));
+  navigator.clipboard.writeText(el.dataset.link).then(function() { showToast('Referral link copied', 'success'); }).catch(function() { showToast('Failed to copy', 'error'); });
 }
 
 function renderApiPage(main) {
@@ -254,60 +254,145 @@ function renderContactsPage(main) {
     '</div>';
 }
 
-function renderDepositPage(main) {
-  main.innerHTML = '<div class="page-header"><h1 class="page-title">Add Balance</h1></div>' +
-    '<div style="max-width:600px;">' +
-    '<div class="stat-card" style="margin-bottom:24px;padding:24px;">' +
-    '<div style="display:flex;align-items:center;justify-content:space-between;">' +
-    '<div><div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:4px;">Current Balance</div>' +
-    '<div style="font-size:32px;font-weight:700;color:var(--accent);letter-spacing:-1px;" id="depositCurrentBalance">$0.00</div></div>' +
-    '<div style="width:56px;height:56px;background:var(--accent-dim);border-radius:14px;display:flex;align-items:center;justify-content:center;">' +
-    '<i class="fas fa-wallet" style="font-size:22px;color:var(--accent);"></i></div></div></div>' +
-    '<div class="stat-card" style="margin-bottom:20px;padding:24px;">' +
-    '<h3 style="font-size:14px;font-weight:600;margin-bottom:16px;">Select Amount</h3>' +
-    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">' +
-    '<div class="dep-amt" onclick="selectDepositAmount(5,this)" style="padding:14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="if(!this.dataset.sel)this.style.borderColor=\'var(--border)\'"><div style="font-size:18px;font-weight:700;">$5</div></div>' +
-    '<div class="dep-amt" onclick="selectDepositAmount(10,this)" style="padding:14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="if(!this.dataset.sel)this.style.borderColor=\'var(--border)\'"><div style="font-size:18px;font-weight:700;">$10</div></div>' +
-    '<div class="dep-amt" data-sel="1" onclick="selectDepositAmount(20,this)" style="padding:14px;background:var(--accent-dim);border:2px solid var(--accent);border-radius:10px;text-align:center;cursor:pointer;transition:all 0.2s;"><div style="font-size:18px;font-weight:700;color:var(--accent);">$20</div><div style="font-size:10px;color:var(--accent);">Popular</div></div>' +
-    '<div class="dep-amt" onclick="selectDepositAmount(50,this)" style="padding:14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="if(!this.dataset.sel)this.style.borderColor=\'var(--border)\'"><div style="font-size:18px;font-weight:700;">$50</div></div>' +
-    '<div class="dep-amt" onclick="selectDepositAmount(100,this)" style="padding:14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="if(!this.dataset.sel)this.style.borderColor=\'var(--border)\'"><div style="font-size:18px;font-weight:700;">$100</div></div>' +
-    '<div style="padding:14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;text-align:center;">' +
-    '<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Custom</div>' +
-    '<input type="number" id="customAmount" placeholder="$" min="1" max="1000" style="width:100%;border:none;background:none;text-align:center;font-size:18px;font-weight:700;font-family:inherit;color:var(--text-primary);outline:none;" oninput="selectCustomAmount(this.value)">' +
-    '</div></div></div>' +
-    '<div class="stat-card" style="margin-bottom:20px;padding:24px;">' +
-    '<h3 style="font-size:14px;font-weight:600;margin-bottom:16px;">Payment Method</h3>' +
-    '<div style="display:flex;flex-direction:column;gap:10px;">' +
-    '<div class="dep-meth" data-sel="1" onclick="selectPaymentMethod(\'usdt\',this)" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--accent-dim);border:2px solid var(--accent);border-radius:12px;cursor:pointer;transition:all 0.2s;">' +
-    '<div style="width:40px;height:40px;background:#26a17b;border-radius:8px;display:flex;align-items:center;justify-content:center;"><i class="fas fa-dollar-sign" style="color:#fff;font-size:18px;"></i></div>' +
-    '<div style="flex:1;"><div style="font-size:14px;font-weight:600;">USDT</div><div style="font-size:11px;color:var(--text-muted);">Tether - Lowest fees</div></div>' +
-    '<div style="width:20px;height:20px;border-radius:50%;border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;"><div style="width:10px;height:10px;border-radius:50%;background:var(--accent);"></div></div></div>' +
-    '<div class="dep-meth" onclick="selectPaymentMethod(\'btc\',this)" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--bg-primary);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor=\'var(--text-muted)\'" onmouseout="if(!this.dataset.sel)this.style.borderColor=\'var(--border)\'">' +
-    '<div style="width:40px;height:40px;background:#f7931a;border-radius:8px;display:flex;align-items:center;justify-content:center;"><i class="fab fa-bitcoin" style="color:#fff;font-size:18px;"></i></div>' +
-    '<div style="flex:1;"><div style="font-size:14px;font-weight:600;">Bitcoin</div><div style="font-size:11px;color:var(--text-muted);">BTC</div></div>' +
-    '<div style="width:20px;height:20px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;"><div style="width:10px;height:10px;border-radius:50%;background:transparent;"></div></div></div>' +
-    '<div class="dep-meth" onclick="selectPaymentMethod(\'eth\',this)" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--bg-primary);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor=\'var(--text-muted)\'" onmouseout="if(!this.dataset.sel)this.style.borderColor=\'var(--border)\'">' +
-    '<div style="width:40px;height:40px;background:#627eea;border-radius:8px;display:flex;align-items:center;justify-content:center;"><i class="fab fa-ethereum" style="color:#fff;font-size:18px;"></i></div>' +
-    '<div style="flex:1;"><div style="font-size:14px;font-weight:600;">Ethereum</div><div style="font-size:11px;color:var(--text-muted);">ETH</div></div>' +
-    '<div style="width:20px;height:20px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;"><div style="width:10px;height:10px;border-radius:50%;background:transparent;"></div></div></div>' +
-    '</div></div>' +
-    '<button class="btn btn-primary" style="width:100%;justify-content:center;padding:16px;font-size:15px;margin-bottom:24px;" onclick="processDeposit()" id="depositPayBtn">' +
-    '<i class="fas fa-lock" style="font-size:13px;"></i> Pay $20.00 Securely</button>' +
-    '<div style="display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:24px;">' +
-    '<i class="fas fa-shield-alt" style="color:var(--text-muted);font-size:12px;"></i>' +
-    '<span style="font-size:11px;color:var(--text-muted);">You will be redirected to a secure payment page. Balance updates automatically.</span></div>' +
-    '<div class="stat-card" style="padding:24px;">' +
-    '<h3 style="font-size:14px;font-weight:600;margin-bottom:16px;">Recent Deposits</h3>' +
-    '<div id="depositHistoryList"><div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Loading...</div></div>' +
-    '</div></div>';
-}
+/* ===== Deposit / Add Funds ===== */
 
 var selectedDepositAmount = 20;
 var selectedPaymentMethod = 'usdt';
+var selectedCryptoCurrency = 'usdttrc20';
+
+var depositMethodInfo = {
+  usdt: {
+    title: 'USDT-TRC20',
+    subtitle: 'Confirmation: 5-10 minutes',
+    fee: 'Fee: ~0.5-1%',
+    note: 'Send USDT via TRC20 network. Do not use ERC20 or BEP20.'
+  },
+  stripe: {
+    title: 'Bank Cards',
+    subtitle: 'Confirmation: 1-5 minutes',
+    fee: 'Fee: 2.9% + $0.30',
+    note: 'Supports Visa, Mastercard and local bank cards.'
+  },
+  crypto: {
+    title: 'Cryptocurrency',
+    subtitle: 'Confirmation: 5-30 minutes depending on network',
+    fee: 'Fee: network fee only, no service fee',
+    note: 'Pay with BTC, ETH, LTC, DOGE, USDT and more through our secure gateway.'
+  }
+};
+
+var cryptoOptions = [
+  { id: 'usdttrc20', name: 'USDT TRC20' },
+  { id: 'btc', name: 'Bitcoin' },
+  { id: 'eth', name: 'Ethereum' },
+  { id: 'ltc', name: 'Litecoin' },
+  { id: 'doge', name: 'Dogecoin' },
+  { id: 'bnb', name: 'BNB' },
+  { id: 'matic', name: 'Polygon' },
+  { id: 'trx', name: 'TRON' },
+  { id: 'sol', name: 'Solana' },
+  { id: 'xrp', name: 'XRP' },
+  { id: 'ada', name: 'Cardano' },
+  { id: 'usdc', name: 'USDC' }
+];
+
+function selectCryptoCurrency(currencyId, el) {
+  selectedCryptoCurrency = currencyId;
+  document.querySelectorAll('.crypto-pick').forEach(function(opt) {
+    opt.style.background = 'var(--bg-primary)';
+    opt.style.borderColor = 'var(--border)';
+    opt.style.color = 'var(--text-secondary)';
+  });
+  el.style.background = 'var(--accent-dim)';
+  el.style.borderColor = 'var(--accent)';
+  el.style.color = 'var(--accent)';
+  updatePayButton();
+}
+
+function getCryptoPickerHTML() {
+  return '<div id="cryptoPicker" style="margin-bottom:20px;">' +
+    '<label style="display:block;font-size:14px;font-weight:600;margin-bottom:10px;">Select cryptocurrency</label>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;">' +
+    cryptoOptions.map(function(c) {
+      var isSelected = c.id === selectedCryptoCurrency;
+      return '<div class="crypto-pick" onclick="selectCryptoCurrency(\'' + c.id + '\', this)" style="padding:10px 14px;border:1px solid ' + (isSelected ? 'var(--accent)' : 'var(--border)') + ';border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;background:' + (isSelected ? 'var(--accent-dim)' : 'var(--bg-primary)') + ';color:' + (isSelected ? 'var(--accent)' : 'var(--text-secondary)') + ';transition:all 0.2s;text-align:center;">' + c.name + '</div>';
+    }).join('') +
+    '</div>' +
+    '<div style="margin-top:10px;font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:6px;">' +
+    '<i class="fas fa-shield-alt" style="color:var(--accent);"></i> Payments processed securely by <strong>NowPayments.io</strong></div>' +
+    '</div>';
+}
+
+function renderDepositPage(main) {
+  var method = depositMethodInfo[selectedPaymentMethod] || depositMethodInfo.usdt;
+  var cryptoPickerBlock = (selectedPaymentMethod === 'crypto') ? getCryptoPickerHTML() : '';
+
+  main.innerHTML = '<div class="page-header"><div><h1 class="page-title">Top Up Balance</h1><div style="font-size:14px;color:var(--text-secondary);margin-top:8px;">Current balance: <strong id="depositCurrentBalance">$0.00</strong></div></div></div>' +
+    '<div style="max-width:980px;display:grid;gap:24px;">' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;">' +
+    '<div class="stat-card" style="padding:24px;min-height:180px;">' +
+    '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;"><div style="width:44px;height:44px;border-radius:14px;background:rgba(0,200,150,0.1);display:flex;align-items:center;justify-content:center;color:var(--accent);"><i class="fas fa-money-bill-wave" style="font-size:18px;"></i></div><div><div style="font-size:16px;font-weight:700;">USDT</div><div style="font-size:13px;color:var(--text-muted);">Confirmation: 5-10 minutes</div></div></div>' +
+    '<div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">Use USDT TRC20 to top up quickly with low fees and near-instant confirmation.</div>' +
+    '<div style="margin-top:18px;"><button class="btn btn-outline dep-meth" data-method="usdt" onclick="selectPaymentMethod(\'usdt\', this)" style="width:100%;padding:12px;font-size:14px;">Select</button></div>' +
+    '</div>' +
+    '<div class="stat-card" style="padding:24px;min-height:180px;">' +
+    '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;"><div style="width:44px;height:44px;border-radius:14px;background:rgba(0,175,193,0.1);display:flex;align-items:center;justify-content:center;color:#00afc1;"><i class="fas fa-credit-card" style="font-size:18px;"></i></div><div><div style="font-size:16px;font-weight:700;">Bank Cards</div><div style="font-size:13px;color:var(--text-muted);">Confirmation: 1-5 minutes</div></div></div>' +
+    '<div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">Pay with cards and get balance instantly. Perfect when you need a smooth, simple checkout.</div>' +
+    '<div style="margin-top:18px;"><button class="btn btn-outline dep-meth" data-method="stripe" onclick="selectPaymentMethod(\'stripe\', this)" style="width:100%;padding:12px;font-size:14px;">Select</button></div>' +
+    '</div>' +
+    '<div class="stat-card" style="padding:24px;min-height:180px;">' +
+    '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;"><div style="width:44px;height:44px;border-radius:14px;background:rgba(247,147,26,0.1);display:flex;align-items:center;justify-content:center;color:#f7931a;"><i class="fas fa-coins" style="font-size:18px;"></i></div><div><div style="font-size:16px;font-weight:700;">Cryptocurrency</div><div style="font-size:13px;color:var(--text-muted);">Secure crypto payment</div></div></div>' +
+    '<div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">Pay with USDT and crypto options through our secure gateway.</div>' +
+    '<div style="margin-top:18px;"><button class="btn btn-outline dep-meth" data-method="crypto" onclick="selectPaymentMethod(\'crypto\', this)" style="width:100%;padding:12px;font-size:14px;">Select</button></div>' +
+    '</div>' +
+    '</div>' +
+    '<div class="stat-card" style="padding:24px;">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:24px;">' +
+    '<div><div id="depositMethodTitle" style="font-size:20px;font-weight:700;margin-bottom:6px;">Top Up By ' + method.title + '</div>' +
+    '<div id="depositMethodSubtitle" style="font-size:14px;color:var(--text-muted);">' + method.subtitle + '</div></div>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;">' +
+    '<button class="btn btn-outline dep-amt" data-amount="5" onclick="selectDepositAmount(5,this)" style="padding:12px 18px;font-size:14px;">US$5</button>' +
+    '<button class="btn btn-outline dep-amt" data-amount="10" onclick="selectDepositAmount(10,this)" style="padding:12px 18px;font-size:14px;">US$10</button>' +
+    '<button class="btn btn-primary dep-amt" data-amount="20" onclick="selectDepositAmount(20,this)" style="padding:12px 18px;font-size:14px;">US$20</button>' +
+    '<button class="btn btn-outline dep-amt" data-amount="50" onclick="selectDepositAmount(50,this)" style="padding:12px 18px;font-size:14px;">US$50</button>' +
+    '<button class="btn btn-outline dep-amt" data-amount="100" onclick="selectDepositAmount(100,this)" style="padding:12px 18px;font-size:14px;">US$100</button>' +
+    '</div></div>' +
+    cryptoPickerBlock +
+    '<div style="margin-bottom:20px;"><label style="display:block;font-size:14px;font-weight:600;margin-bottom:10px;">Top up amount</label>' +
+    '<input type="number" id="customAmount" placeholder="US$" min="2" max="1000" style="width:100%;padding:16px;border:1px solid var(--border);border-radius:12px;background:var(--bg-primary);font-size:16px;outline:none;" oninput="selectCustomAmount(this.value)"></div>' +
+    '<div style="padding:20px;background:rgba(245,248,250,1);border:1px solid var(--border);border-radius:18px;margin-bottom:24px;">' +
+    '<ul style="margin:0;padding:0 0 0 18px;color:var(--text-secondary);font-size:14px;line-height:1.8;">' +
+    '<li>Note that the minimum amount is: US$2</li>' +
+    '<li id="depositFeeNote">' + method.fee + '</li>' +
+    '<li id="depositHintNote">' + method.note + '</li>' +
+    '</ul></div>' +
+    '<button class="btn btn-primary" style="width:100%;padding:16px;font-size:15px;margin-bottom:0;" onclick="processDeposit()" id="depositPayBtn">To Pay $' + selectedDepositAmount.toFixed(2) + '</button>' +
+    '</div>' +
+    '<div class="stat-card" style="padding:24px;">' +
+    '<h3 style="font-size:14px;font-weight:600;margin-bottom:16px;">Recent Deposits</h3>' +
+    '<div id="depositHistoryList"><div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Loading...</div></div>' +
+    '</div>' +
+    '</div>';
+  updateDepositDetails();
+}
+
+function updateDepositDetails() {
+  var method = depositMethodInfo[selectedPaymentMethod] || depositMethodInfo.usdt;
+  var titleEl = document.getElementById('depositMethodTitle');
+  var subtitleEl = document.getElementById('depositMethodSubtitle');
+  var feeNote = document.getElementById('depositFeeNote');
+  var hintNote = document.getElementById('depositHintNote');
+  if (titleEl) titleEl.textContent = 'Top Up By ' + method.title;
+  if (subtitleEl) subtitleEl.textContent = method.subtitle;
+  if (feeNote) feeNote.textContent = method.fee;
+  if (hintNote) hintNote.textContent = method.note;
+  updatePayButton();
+}
 
 function selectDepositAmount(amount, el) {
   selectedDepositAmount = amount;
-  document.getElementById('customAmount').value = '';
+  var customInput = document.getElementById('customAmount');
+  if (customInput) customInput.value = '';
   document.querySelectorAll('.dep-amt').forEach(function(btn) {
     btn.style.background = 'var(--bg-primary)';
     btn.style.border = '1px solid var(--border)';
@@ -338,23 +423,23 @@ function selectPaymentMethod(method, el) {
     opt.style.background = 'var(--bg-primary)';
     opt.style.border = '1px solid var(--border)';
     delete opt.dataset.sel;
-    var dot = opt.querySelector('div:last-child div');
-    if (dot) dot.style.background = 'transparent';
-    var circle = opt.querySelector('div:last-child');
-    if (circle) circle.style.borderColor = 'var(--border)';
   });
   el.style.background = 'var(--accent-dim)';
   el.style.border = '2px solid var(--accent)';
   el.dataset.sel = '1';
-  var dot = el.querySelector('div:last-child div');
-  if (dot) dot.style.background = 'var(--accent)';
-  var circle = el.querySelector('div:last-child');
-  if (circle) circle.style.borderColor = 'var(--accent)';
+  renderDepositPage(document.getElementById('mainContent'));
 }
 
 function updatePayButton() {
   var btn = document.getElementById('depositPayBtn');
-  if (btn) btn.innerHTML = '<i class="fas fa-lock" style="font-size:13px;"></i> Pay $' + selectedDepositAmount.toFixed(2) + ' Securely';
+  if (btn) {
+    var label = 'Pay';
+    if (selectedPaymentMethod === 'crypto') {
+      var found = cryptoOptions.find(function(c) { return c.id === selectedCryptoCurrency; });
+      label = 'Pay with ' + (found ? found.name : 'Crypto');
+    }
+    btn.innerHTML = '<i class="fas fa-lock" style="font-size:13px;"></i> ' + label + ' $' + selectedDepositAmount.toFixed(2) + ' Securely';
+  }
 }
 
 async function processDeposit() {
@@ -365,6 +450,7 @@ async function processDeposit() {
   var btn = document.getElementById('depositPayBtn');
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating payment...';
   btn.disabled = true;
+
   try {
     var res = await fetch('/api/deposit', {
       method: 'POST',
@@ -380,12 +466,17 @@ async function processDeposit() {
       showToast(data.error, 'error');
     } else if (data.url) {
       window.location.href = data.url;
+    } else if (data.success) {
+      if (data.balance !== undefined) updateBalanceDisplay(data.balance);
+      loadDepositHistory();
+      showToast(data.message || 'Deposit completed successfully', 'success');
     } else {
       showToast('Unexpected response', 'error');
     }
   } catch (err) {
     showToast('Connection error. Try again.', 'error');
   }
+
   btn.innerHTML = '<i class="fas fa-lock" style="font-size:13px;"></i> Pay $' + selectedDepositAmount.toFixed(2) + ' Securely';
   btn.disabled = false;
 }
@@ -403,8 +494,8 @@ async function loadDepositHistory() {
     container.innerHTML = deposits.map(function(d) {
       var statusColor = d.status === 'completed' ? 'var(--accent)' : d.status === 'pending' ? 'var(--warning)' : 'var(--danger)';
       var statusText = d.status === 'completed' ? 'Completed' : d.status === 'pending' ? 'Pending' : 'Failed';
-      var methodLabels = { usdt: 'USDT', btc: 'BTC', eth: 'ETH', stripe: 'Card', paypal: 'PayPal' };
-      var methodLabel = methodLabels[d.method] || d.method;
+      var methodLabels = { usdt: 'USDT', btc: 'BTC', eth: 'ETH', ltc: 'LTC', doge: 'DOGE', bnb: 'BNB', sol: 'SOL', xrp: 'XRP', stripe: 'Card', usdc: 'USDC', matic: 'MATIC', ada: 'ADA', trx: 'TRX', usdttrc20: 'USDT TRC20' };
+      var methodLabel = methodLabels[d.method] || methodLabels[d.pay_currency] || d.method || 'Unknown';
       var date = new Date(d.created_at);
       var timeStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       var bgColor = d.status === 'completed' ? 'var(--accent-dim)' : d.status === 'pending' ? 'rgba(212,136,6,0.08)' : 'rgba(217,48,37,0.06)';

@@ -280,52 +280,90 @@ function renderContactsPage(main) {
     '</div>';
 }
 
+var depositMethodInfo = {
+  usdt: {
+    title: 'USDT-TRC20',
+    subtitle: 'Confirmation: 5-10 minutes',
+    fee: 'Fee: 1%',
+    note: 'Use TRC20 network for the fastest transfer.'
+  },
+  stripe: {
+    title: 'Bank Cards',
+    subtitle: 'Confirmation: 1-5 minutes',
+    fee: 'Fee: 2.9% + $0.3',
+    note: 'Supports Visa, Mastercard and local bank cards.'
+  },
+  crypto: {
+    title: 'Cryptocurrencies',
+    subtitle: 'Confirmation: 10-20 minutes',
+    fee: 'Fee: from 0.6%',
+    note: 'Pay with BTC, ETH or other supported coins.'
+  }
+};
+
 function renderDepositPage(main) {
-  main.innerHTML = '<div class="page-header"><h1 class="page-title">Add Balance</h1></div>' +
-    '<div style="max-width:600px;">' +
-    '<div class="stat-card" style="margin-bottom:24px;padding:24px;">' +
-    '<div style="display:flex;align-items:center;justify-content:space-between;">' +
-    '<div><div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:4px;">Current Balance</div>' +
-    '<div style="font-size:32px;font-weight:700;color:var(--accent);letter-spacing:-1px;" id="depositCurrentBalance">$0.00</div></div>' +
-    '<div style="width:56px;height:56px;background:var(--accent-dim);border-radius:14px;display:flex;align-items:center;justify-content:center;">' +
-    '<i class="fas fa-wallet" style="font-size:22px;color:var(--accent);"></i></div></div></div>' +
-    '<div class="stat-card" style="margin-bottom:20px;padding:24px;">' +
-    '<h3 style="font-size:14px;font-weight:600;margin-bottom:16px;">Select Amount</h3>' +
-    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">' +
-    '<div class="dep-amt" onclick="selectDepositAmount(5,this)" style="padding:14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="if(!this.dataset.sel)this.style.borderColor=\'var(--border)\'"><div style="font-size:18px;font-weight:700;">$5</div></div>' +
-    '<div class="dep-amt" onclick="selectDepositAmount(10,this)" style="padding:14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="if(!this.dataset.sel)this.style.borderColor=\'var(--border)\'"><div style="font-size:18px;font-weight:700;">$10</div></div>' +
-    '<div class="dep-amt" data-sel="1" onclick="selectDepositAmount(20,this)" style="padding:14px;background:var(--accent-dim);border:2px solid var(--accent);border-radius:10px;text-align:center;cursor:pointer;transition:all 0.2s;"><div style="font-size:18px;font-weight:700;color:var(--accent);">$20</div><div style="font-size:10px;color:var(--accent);">Popular</div></div>' +
-    '<div class="dep-amt" onclick="selectDepositAmount(50,this)" style="padding:14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="if(!this.dataset.sel)this.style.borderColor=\'var(--border)\'"><div style="font-size:18px;font-weight:700;">$50</div></div>' +
-    '<div class="dep-amt" onclick="selectDepositAmount(100,this)" style="padding:14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="if(!this.dataset.sel)this.style.borderColor=\'var(--border)\'"><div style="font-size:18px;font-weight:700;">$100</div></div>' +
-    '<div style="padding:14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;text-align:center;">' +
-    '<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Custom</div>' +
-    '<input type="number" id="customAmount" placeholder="$" min="1" max="1000" style="width:100%;border:none;background:none;text-align:center;font-size:18px;font-weight:700;font-family:inherit;color:var(--text-primary);outline:none;" oninput="selectCustomAmount(this.value)">' +
-    '</div></div></div>' +
-    '<div class="stat-card" style="margin-bottom:20px;padding:24px;">' +
-    '<h3 style="font-size:14px;font-weight:600;margin-bottom:16px;">Payment Method</h3>' +
-    '<div style="display:flex;flex-direction:column;gap:10px;">' +
-    '<div class="dep-meth" data-sel="1" onclick="selectPaymentMethod(\'usdt\',this)" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--accent-dim);border:2px solid var(--accent);border-radius:12px;cursor:pointer;transition:all 0.2s;">' +
-    '<div style="width:40px;height:40px;background:#26a17b;border-radius:8px;display:flex;align-items:center;justify-content:center;"><i class="fas fa-dollar-sign" style="color:#fff;font-size:18px;"></i></div>' +
-    '<div style="flex:1;"><div style="font-size:14px;font-weight:600;">USDT</div><div style="font-size:11px;color:var(--text-muted);">Tether - Lowest fees</div></div>' +
-    '<div style="width:20px;height:20px;border-radius:50%;border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;"><div style="width:10px;height:10px;border-radius:50%;background:var(--accent);"></div></div></div>' +
-    '<div class="dep-meth" onclick="selectPaymentMethod(\'btc\',this)" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--bg-primary);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor=\'var(--text-muted)\'" onmouseout="if(!this.dataset.sel)this.style.borderColor=\'var(--border)\'">' +
-    '<div style="width:40px;height:40px;background:#f7931a;border-radius:8px;display:flex;align-items:center;justify-content:center;"><i class="fab fa-bitcoin" style="color:#fff;font-size:18px;"></i></div>' +
-    '<div style="flex:1;"><div style="font-size:14px;font-weight:600;">Bitcoin</div><div style="font-size:11px;color:var(--text-muted);">BTC</div></div>' +
-    '<div style="width:20px;height:20px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;"><div style="width:10px;height:10px;border-radius:50%;background:transparent;"></div></div></div>' +
-    '<div class="dep-meth" onclick="selectPaymentMethod(\'eth\',this)" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--bg-primary);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor=\'var(--text-muted)\'" onmouseout="if(!this.dataset.sel)this.style.borderColor=\'var(--border)\'">' +
-    '<div style="width:40px;height:40px;background:#627eea;border-radius:8px;display:flex;align-items:center;justify-content:center;"><i class="fab fa-ethereum" style="color:#fff;font-size:18px;"></i></div>' +
-    '<div style="flex:1;"><div style="font-size:14px;font-weight:600;">Ethereum</div><div style="font-size:11px;color:var(--text-muted);">ETH</div></div>' +
-    '<div style="width:20px;height:20px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;"><div style="width:10px;height:10px;border-radius:50%;background:transparent;"></div></div></div>' +
+  var method = depositMethodInfo[selectedPaymentMethod] || depositMethodInfo.usdt;
+  main.innerHTML = '<div class="page-header"><h1 class="page-title">Top Up Balance</h1></div>' +
+    '<div style="max-width:980px;display:grid;gap:24px;">' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;">' +
+    '<div class="stat-card" style="padding:24px;min-height:180px;">' +
+    '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;"><div style="width:44px;height:44px;border-radius:14px;background:rgba(46,125,50,0.1);display:flex;align-items:center;justify-content:center;color:#2e7d32;"><i class="fab fa-alipay" style="font-size:18px;"></i></div><div><div style="font-size:16px;font-weight:700;">Alipay</div><div style="font-size:13px;color:var(--text-muted);">Confirmation: 1-5 minutes</div></div></div>' +
+    '<div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">Fast mobile payments for customers who prefer Alipay. Ideal for quick top-ups with a familiar checkout flow.</div>' +
+    '<div style="margin-top:18px;"><button class="btn btn-outline" onclick="selectPaymentMethod('stripe', this)" style="width:100%;padding:12px;font-size:14px;">Select</button></div>' +
+    '</div>' +
+    '<div class="stat-card" style="padding:24px;min-height:180px;">' +
+    '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;"><div style="width:44px;height:44px;border-radius:14px;background:rgba(0,175,193,0.1);display:flex;align-items:center;justify-content:center;color:#00afc1;"><i class="fas fa-credit-card" style="font-size:18px;"></i></div><div><div style="font-size:16px;font-weight:700;">Bank Cards</div><div style="font-size:13px;color:var(--text-muted);">Confirmation: 1-5 minutes</div></div></div>' +
+    '<div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">Pay with cards and get balance instantly. Perfect when you need a smooth, simple checkout.</div>' +
+    '<div style="margin-top:18px;"><button class="btn btn-primary" onclick="selectPaymentMethod('stripe', this)" style="width:100%;padding:12px;font-size:14px;">Select</button></div>' +
+    '</div>' +
+    '<div class="stat-card" style="padding:24px;min-height:180px;">' +
+    '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;"><div style="width:44px;height:44px;border-radius:14px;background:rgba(247,147,26,0.1);display:flex;align-items:center;justify-content:center;color:#f7931a;"><i class="fas fa-coins" style="font-size:18px;"></i></div><div><div style="font-size:16px;font-weight:700;">Cryptocurrencies</div><div style="font-size:13px;color:var(--text-muted);">Confirmation: 10-20 minutes</div></div></div>' +
+    '<div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">Use crypto for low-fee deposits and no bank card required. Works great for global users.</div>' +
+    '<div style="margin-top:18px;"><button class="btn btn-outline" onclick="selectPaymentMethod('crypto', this)" style="width:100%;padding:12px;font-size:14px;">Select</button></div>' +
+    '</div>' +
+    '</div>' +
+    '<div class="stat-card" style="padding:24px;">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:24px;">' +
+    '<div><div id="depositMethodTitle" style="font-size:20px;font-weight:700;margin-bottom:6px;">Top Up By ' + method.title + '</div>' +
+    '<div id="depositMethodSubtitle" style="font-size:14px;color:var(--text-muted);">' + method.subtitle + '</div></div>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;">' +
+    '<button class="btn btn-outline" onclick="selectDepositAmount(5,this)" style="padding:12px 18px;font-size:14px;">US$5</button>' +
+    '<button class="btn btn-outline" onclick="selectDepositAmount(10,this)" style="padding:12px 18px;font-size:14px;">US$10</button>' +
+    '<button class="btn btn-primary" onclick="selectDepositAmount(20,this)" style="padding:12px 18px;font-size:14px;">US$20</button>' +
+    '<button class="btn btn-outline" onclick="selectDepositAmount(50,this)" style="padding:12px 18px;font-size:14px;">US$50</button>' +
+    '<button class="btn btn-outline" onclick="selectDepositAmount(100,this)" style="padding:12px 18px;font-size:14px;">US$100</button>' +
     '</div></div>' +
-    '<button class="btn btn-primary" style="width:100%;justify-content:center;padding:16px;font-size:15px;margin-bottom:24px;" onclick="processDeposit()" id="depositPayBtn">' +
-    '<i class="fas fa-lock" style="font-size:13px;"></i> Pay $20.00 Securely</button>' +
-    '<div style="display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:24px;">' +
-    '<i class="fas fa-shield-alt" style="color:var(--text-muted);font-size:12px;"></i>' +
-    '<span style="font-size:11px;color:var(--text-muted);">You will be redirected to a secure payment page. Balance updates automatically.</span></div>' +
+    '<div style="margin-bottom:20px;"><label style="display:block;font-size:14px;font-weight:600;margin-bottom:10px;">Top up amount</label>' +
+    '<input type="number" id="customAmount" placeholder="US$" min="1" max="1000" style="width:100%;padding:16px;border:1px solid var(--border);border-radius:12px;background:var(--bg-primary);font-size:16px;outline:none;" oninput="selectCustomAmount(this.value)"></div>' +
+    '<div style="padding:20px;background:rgba(245,248,250,1);border:1px solid var(--border);border-radius:18px;margin-bottom:24px;">' +
+    '<ul style="margin:0;padding:0 0 0 18px;color:var(--text-secondary);font-size:14px;line-height:1.8;">' +
+    '<li>Note that the minimum amount is: US$3</li>' +
+    '<li id="depositFeeNote">' + method.fee + '</li>' +
+    '<li id="depositHintNote">' + method.note + '</li>' +
+    '</ul></div>' +
+    '<button class="btn btn-primary" style="width:100%;padding:16px;font-size:15px;margin-bottom:0;" onclick="processDeposit()" id="depositPayBtn">To Pay $' + selectedDepositAmount.toFixed(2) + '</button>' +
+    '</div>' +
     '<div class="stat-card" style="padding:24px;">' +
     '<h3 style="font-size:14px;font-weight:600;margin-bottom:16px;">Recent Deposits</h3>' +
     '<div id="depositHistoryList"><div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Loading...</div></div>' +
-    '</div></div>';
+    '</div>' +
+    '</div>';
+  updateDepositDetails();
+}
+
+function updateDepositDetails() {
+  var method = depositMethodInfo[selectedPaymentMethod] || depositMethodInfo.usdt;
+  var titleEl = document.getElementById('depositMethodTitle');
+  var subtitleEl = document.getElementById('depositMethodSubtitle');
+  var feeNote = document.getElementById('depositFeeNote');
+  var hintNote = document.getElementById('depositHintNote');
+  if (titleEl) titleEl.textContent = 'Top Up By ' + method.title;
+  if (subtitleEl) subtitleEl.textContent = method.subtitle;
+  if (feeNote) feeNote.textContent = method.fee;
+  if (hintNote) hintNote.textContent = method.note;
+  updatePayButton();
+}
+
 }
 
 var selectedDepositAmount = 20;

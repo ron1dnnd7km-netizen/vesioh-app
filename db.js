@@ -71,4 +71,5 @@ db.exec(`
   );
 `);
 try { db.exec('ALTER TABLE deposits ADD COLUMN reference TEXT'); } catch(e) {}
+try { db.exec('ALTER TABLE deposits ADD COLUMN pay_currency TEXT'); } catch(e) {}
 module.exports = db;
