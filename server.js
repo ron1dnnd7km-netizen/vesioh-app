@@ -241,12 +241,13 @@ app.post('/api/numbers/request', async function(req, res) {
 });
 
 function startPolling(numberId, providerRequestId, serviceName) {
+  console.log('STARTED POLLING FOR NUMBER:', numberId, 'REQUEST:', providerRequestId);
   var provider = require('./sms-provider');
   var attempts = 0;
-  var interval = setInterval(async function() {
     attempts++;
     try {
-      var result = await provider.checkCode(providerRequestId);
+    var result = await provider.checkCode(providerRequestId);
+      console.log('POLL CHECK (' + attempts + '):', JSON.stringify(result));
       if (result.success && result.code) {
         clearInterval(interval);
         var smsText = 'Your ' + serviceName + ' verification code is ' + result.code + '. Do not share it with anyone.';
