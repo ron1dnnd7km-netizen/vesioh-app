@@ -54,6 +54,7 @@ var smsBus = {
       var url = this.apiBase + '/order/create';
       var response = await fetch(url, {
         method: 'POST',
+        agent: httpsAgent,
         headers: {
           'Authorization': 'Bearer ' + SMS_API_KEY,
           'Content-Type': 'application/json'
@@ -79,6 +80,7 @@ var smsBus = {
     try {
       var url = this.apiBase + '/order/sms?order_id=' + requestId;
       var response = await fetch(url, {
+        agent: httpsAgent,
         headers: { 'Authorization': 'Bearer ' + SMS_API_KEY }
       });
       var text = await response.text();
@@ -100,6 +102,7 @@ var smsBus = {
       var url = this.apiBase + '/order/delete?order_id=' + requestId;
       var response = await fetch(url, {
         method: 'POST',
+        agent: httpsAgent,
         headers: { 'Authorization': 'Bearer ' + SMS_API_KEY }
       });
       var data = await response.json();
@@ -112,6 +115,7 @@ var smsBus = {
       var url = this.apiBase + '/order/finish?order_id=' + requestId;
       var response = await fetch(url, {
         method: 'POST',
+        agent: httpsAgent,
         headers: { 'Authorization': 'Bearer ' + SMS_API_KEY }
       });
       var data = await response.json();
@@ -154,5 +158,6 @@ var smsBus = {
     return map[country] || 'us';
   }
 };
+
 // FORCED TO RETURN SMS-BUS
 module.exports = smsBus;

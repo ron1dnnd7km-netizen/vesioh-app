@@ -264,19 +264,16 @@ var depositMethodInfo = {
   usdt: {
     title: 'USDT-TRC20',
     subtitle: 'Confirmation: 5-10 minutes',
-    fee: 'Fee: ~0.5-1%',
     note: 'Send USDT via TRC20 network. Do not use ERC20 or BEP20.'
   },
   stripe: {
     title: 'Bank Cards',
     subtitle: 'Confirmation: 1-5 minutes',
-    fee: 'Fee: 2.9% + $0.30',
     note: 'Supports Visa, Mastercard and local bank cards.'
   },
   crypto: {
     title: 'Cryptocurrency',
     subtitle: 'Confirmation: 5-30 minutes depending on network',
-    fee: 'Fee: network fee only, no service fee',
     note: 'Pay with BTC, ETH, LTC, DOGE, USDT and more through our secure gateway.'
   }
 };
@@ -302,6 +299,17 @@ function selectCryptoCurrency(currencyId, el) {
   el.style.background = 'var(--accent-dim)';
   el.style.borderColor = 'var(--accent)';
   el.style.color = 'var(--accent)';
+  
+  // Dynamically update the minimum note based on selected coin
+  var minNote = document.getElementById('cryptoMinNote');
+  if (minNote) {
+    if (currencyId === 'USDT_TRX') {
+      minNote.textContent = 'Note that the minimum amount for USDT TRC-20 is: US$5';
+    } else {
+      minNote.textContent = 'Note that the minimum amount is: US$2';
+    }
+  }
+  
   updatePayButton();
 }
 
@@ -358,7 +366,7 @@ function renderDepositPage(main) {
     '<input type="number" id="customAmount" placeholder="US$" min="2" max="1000" style="width:100%;padding:16px;border:1px solid var(--border);border-radius:12px;background:var(--bg-primary);font-size:16px;outline:none;" oninput="selectCustomAmount(this.value)"></div>' +
     '<div style="padding:20px;background:rgba(245,248,250,1);border:1px solid var(--border);border-radius:18px;margin-bottom:24px;">' +
     '<ul style="margin:0;padding:0 0 0 18px;color:var(--text-secondary);font-size:14px;line-height:1.8;">' +
-    '<li>Note that the minimum amount is: US$2</li>' +
+    '<li id="cryptoMinNote">Note that the minimum amount is: US$2</li>' +
     '<li id="depositFeeNote">' + method.fee + '</li>' +
     '<li id="depositHintNote">' + method.note + '</li>' +
     '</ul></div>' +
