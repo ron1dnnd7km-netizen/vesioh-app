@@ -47,34 +47,47 @@ var smsBus = {
   },
 
   complete: async function(requestId) {
-    // SMS-BUS auto-completes when SMS is received or times out
     return true;
   },
 
   getServiceCode: function(serviceName) {
-    // SMS-BUS uses NUMBERS for project_id (e.g., 1=Telegram, 2=PayPal)
+    // EXACT IDs from your SMS-BUS dashboard list
     var map = {
-      'WhatsApp': '1',
       'Telegram': '1',
-      'Facebook': '2',
-      'Instagram': '3',
-      'Google': '4',
-      'Twitter / X': '5',
-      'TikTok': '6',
-      'Discord': '7',
-      'Amazon': '8',
-      'Microsoft': '9',
-      'Fiverr': '10',
       'PayPal': '2',
-      'Steam': '11',
-      'Uber': '12',
-      'Lyft': '13'
+      'TikTok': '3',
+      'WhatsApp': '5',
+      'Google': '8',
+      'Microsoft': '11',
+      'Uber': '13',
+      'Coinbase': '19',
+      'Bumble': '60',
+      'Cash App': '63',
+      'OpenAI/ChatGPT': '52',
+      'Line': '81',
+      'Tinder': '82',
+      'Facebook': '83',
+      'Twitter / X': '85',
+      'Nike': '87',
+      'Amazon': '88',
+      'Instagram': '89',
+      'Netflix': '90',
+      'Discord': '94',
+      'Venmo': '98',
+      'Snapchat': '115',
+      'Fiverr': '117',
+      'Etsy': '129',
+      'Steam': '152',
+      'Lyft': '178',
+      'LinkedIn': '196',
+      'Roblox': '210',
+      'Binance': '287'
     };
-    return map[serviceName] || '1';
+    return map[serviceName] || '5'; // Defaults to WhatsApp if not in the list
   },
 
   getCountryCode: function(country) {
-    // SMS-BUS uses NUMBERS for country_id (e.g., 1=USA, 2=Russia)
+    // IDs from your SMS-BUS dashboard (1=USA, etc.)
     var map = {
       'US': '1',
       'UK': '2',
