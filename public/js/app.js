@@ -31,7 +31,6 @@ function initSidebar() {
   document.body.appendChild(overlay);
 
   hamburger.addEventListener('click', function() {
-    console.log('Hamburger clicked');
     var emailEl = document.getElementById('mobileSidebarEmail');
     if (emailEl && typeof getUserEmail === 'function') emailEl.textContent = getUserEmail();
     sidebar.classList.add('active');
@@ -61,7 +60,6 @@ function updateHash(page) {
 }
 
 function goToPage(page) {
-  console.log('Going to page:', page);
   closeMobileSidebar();
   window.currentPage = page;
   updateHash(page);
@@ -164,8 +162,21 @@ async function checkExpiredNumbers() {
 }
 
 async function autoRefreshNumbers() {
-  if (window.currentPage === 'numbers' && window.activeNumbers.some(function(n) { return n.status === 'waiting'; })) { 
-    await loadNumbers(); renderMainContent(); 
+  if (window.currentPage !== 'numbers' || !window.activeNumbers) return;
+  
+  var needsRefresh = window.activeNumbers.some(function(n) { return n.status === 'waiting'; });
+  var hasNewCode = window.activeNumbers.some(function(n) { return n.status === 'received' && !n.shown; });
+
+  if (needsRefresh || hasNewCode) {
+    await loadNumbers();
+    renderMainContent();
+    
+    window.activeNumbers.forEach(function(n) {
+      if (n.status === 'received' && !n.shown) {
+        n.shown = true;
+        showToast('SMS received for ' + n.service_name + '!', 'success');
+      }
+    });
   }
 }
 
@@ -200,11 +211,7 @@ async function loadHistory() {
     var res = await fetch('/api/history/' + getUserEmail());
     if (!res.ok) throw new Error('HTTP ' + res.status);
     window.historyData = await res.json();
-    console.log('History loaded:', window.historyData.length, 'items');
-  } catch(e) {
-    console.error('Error loading history:', e);
-    window.historyData = [];
-  }
+  } catch(e) { window.historyData = []; }
 }
 
 // ====== MAIN CONTENT ROUTER ======
