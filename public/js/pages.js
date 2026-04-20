@@ -282,17 +282,14 @@ var depositMethodInfo = {
 };
 
 var cryptoOptions = [
-  { id: 'usdttrc20', name: 'USDT TRC20' },
-  { id: 'btc', name: 'Bitcoin' },
-  { id: 'eth', name: 'Ethereum' },
-  { id: 'ltc', name: 'Litecoin' },
-  { id: 'doge', name: 'Dogecoin' },
-  { id: 'matic', name: 'Polygon' },
-  { id: 'trx', name: 'TRON' },
-  { id: 'sol', name: 'Solana' },
-  { id: 'xrp', name: 'XRP' },
-  { id: 'ada', name: 'Cardano' },
-  { id: 'usdc', name: 'USDC' }
+  { id: 'USDT_TRX', name: 'USDT TRC-20' },
+  { id: 'TRX', name: 'TRON' },
+  { id: 'BTC', name: 'Bitcoin' },
+  { id: 'ETH', name: 'Ethereum' },
+  { id: 'LTC', name: 'Litecoin' },
+  { id: 'DOGE', name: 'Dogecoin' },
+  { id: 'BNB', name: 'BNB Chain' },
+  { id: 'SOL', name: 'Solana' }
 ];
 
 function selectCryptoCurrency(currencyId, el) {
@@ -442,10 +439,13 @@ function updatePayButton() {
 }
 
 async function processDeposit() {
-  if (selectedCryptoCurrency === 'usdttrc20' && selectedDepositAmount < 15) {
-    showToast('Minimum for USDT TRC20 is $15.00', 'error');
+  // Check specific USDT TRC-20 minimum (Plisio requires $5)
+  if (selectedCryptoCurrency === 'USDT_TRX' && selectedDepositAmount < 5) {
+    showToast('Minimum for USDT TRC-20 is $5.00', 'error');
     return;
   }
+  
+  // General minimum for other coins
   if (selectedDepositAmount < 2) {
     showToast('Minimum deposit is $2.00', 'error');
     return;
@@ -455,18 +455,12 @@ async function processDeposit() {
   btn.disabled = true;
 
   try {
-    var endpoint = '/api/deposit';
+    var endpoint = '/api/deposit/nowpayments';
     var payload = {
       email: getUserEmail(),
       amount: selectedDepositAmount,
-      method: selectedPaymentMethod
+      pay_currency: selectedCryptoCurrency
     };
-
-    if (selectedPaymentMethod === 'crypto') {
-      endpoint = '/api/deposit/crypto';
-      payload.pay_currency = selectedCryptoCurrency;
-      delete payload.method;
-    }
 
     var res = await fetch(endpoint, {
       method: 'POST',
@@ -476,13 +470,13 @@ async function processDeposit() {
     var data = await res.json();
     if (data.error) {
       showToast(data.error, 'error');
-    } else if (data.url || data.invoice_url) {
-      window.location.href = data.url || data.invoice_url;
+    } else if (data.invoice_url) {
+      window.location.href = data.invoice_url;
     } else {
       showToast('Unexpected response', 'error');
     }
   } catch (err) {
-        showToast('Error: ' + err.message, 'error');
+    showToast('Error: ' + err.message, 'error');
   }
 
   btn.innerHTML = '<i class="fas fa-lock" style="font-size:13px;"></i> Pay $' + selectedDepositAmount.toFixed(2) + ' Securely';

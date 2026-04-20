@@ -75,7 +75,7 @@ app.post('/api/auth/signup', function(req, res) {
   if (existing) return res.status(400).json({ error: 'Email already registered' });
   var hash = bcrypt.hashSync(password, 10);
   db.prepare('INSERT INTO users (email, password, balance) VALUES (?, ?, 0.00)').run(email, hash);
-  res.json({ email: email, message: 'Account created. $6.00 credits added.' });
+    res.json({ email: email, message: 'Account created successfully.' });
 });
 
 app.post('/api/auth/login', function(req, res) {
@@ -96,17 +96,9 @@ app.post('/api/auth/forgot-password', function(req, res) {
 
 // ====== USER ======
 app.get('/api/user/:email', function(req, res) {
-  var user = db.prepare('SELECT balance FROM users WHERE email = ?').get(req.params.email);
+  var user = db.prepare('SELECT balance, email as refCode FROM users WHERE email = ?').get(req.params.email);
   if (!user) return res.status(404).json({ error: 'User not found' });
-  res.json({ balance: user.balance });
-});
-
-app.post('/api/user/:email/balance', function(req, res) {
-  var amount = req.body.amount;
-  if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
-  db.prepare('UPDATE users SET balance = balance + ? WHERE email = ?').run(amount, req.params.email);
-  var user = db.prepare('SELECT balance FROM users WHERE email = ?').get(req.params.email);
-  res.json({ balance: user.balance });
+  res.json({ balance: user.balance, refCode: user.refCode });
 });
 
 // ====== PLISIO HELPER ======
@@ -114,39 +106,38 @@ async function createPlisioInvoice(amount, currency, reference, email) {
   var apiKey = process.env.PLISIO_SECRET_KEY;
   if (!apiKey) throw new Error('Plisio API key not configured in .env');
 
-  var body = {
+  // Plisio requires GET request with query parameters
+  var params = new URLSearchParams({
     source_currency: 'USD',
     source_amount: amount,
     order_number: reference,
     order_name: 'SMS Virtual Code deposit - ' + email,
-    cancel_url: process.env.FRONTEND_URL + '/?deposit=failed',
-    success_url: process.env.FRONTEND_URL + '/?deposit=success&ref=' + reference,
-    callback_url: process.env.FRONTEND_URL + '/api/deposit/plisio-callback',
-    email: email
-  };
+    currency: (currency || 'TRX').toUpperCase(),
+    email: email,
+    callback_url: process.env.FRONTEND_URL + '/api/deposit/plisio-callback?json=true',
+    success_invoice_url: process.env.FRONTEND_URL + '/?deposit=success&ref=' + reference,
+    fail_invoice_url: process.env.FRONTEND_URL + '/?deposit=failed',
+    api_key: apiKey
+  });
 
-  if (currency) {
-    body.currency = currency;
-  }
-
-  var response = await fetch('https://plisio.net/api/v1/invoices/new', {
-    method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Plisio-API-Key': apiKey 
-    },
-    body: JSON.stringify(body)
+  // Notice the GET method and the correct api.plisio.net domain!
+  var response = await fetch('https://api.plisio.net/api/v1/invoices/new?' + params.toString(), {
+    method: 'GET'
   });
 
   var data = await response.json();
+
   if (data.status !== 'success') {
-    throw new Error(data.err_msg || 'Plisio error');
+    throw new Error(data.data.message || 'Plisio error');
+  }
+  if (!data.data.invoice_url) {
+    throw new Error('No invoice URL returned from Plisio');
   }
   return data.data;
 }
 
 // ====== DEPOSIT: CRYPTO ======
-app.post('/api/deposit/crypto', async function(req, res) {
+app.post('/api/deposit/nowpayments', async function(req, res) {
   var email = req.body.email;
   var amount = req.body.amount;
   var payCurrency = req.body.pay_currency || 'TRX';

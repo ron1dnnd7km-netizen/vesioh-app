@@ -160,6 +160,7 @@ function logout() {
   currentUser = null;
   localStorage.removeItem('smsvc_user');
   sessionStorage.removeItem('smsvc_user');
+  if (typeof closeMobileSidebar === 'function') closeMobileSidebar();
   showLanding();
   showToast('Logged out successfully', 'info');
 }

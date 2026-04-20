@@ -31,6 +31,7 @@ function initSidebar() {
   document.body.appendChild(overlay);
 
   hamburger.addEventListener('click', function() {
+    console.log('Hamburger clicked');
     var emailEl = document.getElementById('mobileSidebarEmail');
     if (emailEl && typeof getUserEmail === 'function') emailEl.textContent = getUserEmail();
     sidebar.classList.add('active');
@@ -48,16 +49,30 @@ function closeMobileSidebar() {
 }
 
 // ====== NAVIGATION ======
+function getPageFromHash() {
+  var hash = window.location.hash.replace('#', '').trim();
+  return hash ? hash : 'numbers';
+}
+
+function updateHash(page) {
+  if (window.location.hash.replace('#', '') !== page) {
+    window.history.replaceState(null, '', '#' + page);
+  }
+}
+
 function goToPage(page) {
+  console.log('Going to page:', page);
   closeMobileSidebar();
   window.currentPage = page;
-  
+  updateHash(page);
+
   document.querySelectorAll('.nav-link').forEach(function(l) { l.classList.remove('active'); });
   var btn = document.querySelector("[data-page='" + page + "']");
   if (btn) btn.classList.add('active');
   
-  preLoadPageData(page);
-  renderMainContent();
+  Promise.resolve(preLoadPageData(page)).then(function() {
+    renderMainContent();
+  });
 }
 
 function navigateTo(page) {
@@ -70,16 +85,25 @@ function initNavigation() {
   });
 }
 
+window.addEventListener('hashchange', function() {
+  var page = getPageFromHash();
+  if (page !== window.currentPage) goToPage(page);
+});
+
 function preLoadPageData(page) {
-  if (page === 'history') loadHistory();
-  else if (page === 'numbers') loadNumbers();
-  else if (page === 'deposit') {
-    loadBalance().then(function(b) {
+  if (page === 'history') {
+    return loadHistory();
+  } else if (page === 'numbers') {
+    return loadNumbers();
+  } else if (page === 'deposit') {
+    var balancePromise = loadBalance().then(function(b) {
       var el = document.getElementById('depositCurrentBalance');
       if (el) el.textContent = '$' + b.toFixed(2);
     });
-    if (typeof loadDepositHistory === 'function') loadDepositHistory();
+    var historyPromise = (typeof loadDepositHistory === 'function') ? loadDepositHistory() : Promise.resolve();
+    return Promise.all([balancePromise, historyPromise]);
   }
+  return Promise.resolve();
 }
 
 // ====== SEARCH & DROPDOWNS ======
@@ -172,7 +196,15 @@ async function loadNumbers() {
 
 async function loadHistory() {
   if (typeof getUserEmail !== 'function') { window.historyData = []; return; }
-  try { var res = await fetch('/api/history/' + getUserEmail()); if (!res.ok) throw new Error(); window.historyData = await res.json(); } catch(e) { window.historyData = []; }
+  try {
+    var res = await fetch('/api/history/' + getUserEmail());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    window.historyData = await res.json();
+    console.log('History loaded:', window.historyData.length, 'items');
+  } catch(e) {
+    console.error('Error loading history:', e);
+    window.historyData = [];
+  }
 }
 
 // ====== MAIN CONTENT ROUTER ======
@@ -219,7 +251,6 @@ function checkDepositReturn() {
 }
 
 // ====== USER ACTIONS ======
-function logout() { stopIntervals(); document.getElementById('appPages').style.display = 'none'; document.getElementById('authPages').style.display = 'block'; }
 function deleteAccount() { if (confirm(translations[currentLang]['Are you sure you want to delete your account? This action cannot be undone.'])) showToast(translations[currentLang]['Account deletion not implemented yet'], 'error'); }
 
 // ====== TRANSLATIONS ======
@@ -244,6 +275,12 @@ function applyTranslations() {
 
 // ====== BOOT ======
 async function bootSequence() {
-  if (typeof showApp === 'function') { var orig = showApp; showApp = async function() { await orig(); await loadBalance(); await loadNumbers(); window.currentPage = 'numbers'; renderMainContent(); }; }
+  if (typeof showApp === 'function') { var orig = showApp; showApp = async function() {
+    await orig();
+    await loadBalance();
+    await loadNumbers();
+    window.currentPage = getPageFromHash();
+    renderMainContent();
+  }; }
   if (typeof checkSession === 'function') checkSession();
 }
