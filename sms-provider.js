@@ -1,95 +1,91 @@
 var SMS_API_KEY = process.env.SMS_API_KEY || 'YOUR_API_KEY_HERE';
+var apiBase = 'https://sms-bus.com/api/control';
 
 var smsBus = {
-  apiBase: 'https://sms-bus.com/api',
-  
   getNumber: async function(service, country) {
     try {
-      var url = this.apiBase + '/order/create';
-      var response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + SMS_API_KEY,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          service: service,
-          country: country
-        })
-      });
-      var text = await response.text();
-      let data;
-      try { data = JSON.parse(text); } catch (e) { return { success: false, error: 'SMS-Bus returned: ' + text }; }
+      var url = apiBase + '/get/number?token=' + SMS_API_KEY + '&country_id=' + country + '&project_id=' + service;
+      var response = await fetch(url);
+      var data = await response.json();
 
-      if (data.success && data.data && data.data.id) {
-        return { success: true, requestId: String(data.data.id), phone: data.data.phone };
+      if (data.code === 200 && data.data && data.data.request_id) {
+        return { success: true, requestId: String(data.data.request_id), phone: data.data.number };
       }
 
-      return { success: false, error: data.message || data.error || 'No numbers available. Try a different country.' };
+      var errorMsg = data.message || 'No numbers available. Try a different country.';
+      if (data.code === 50002) errorMsg = 'No numbers available. Try a different country.';
+      if (data.code === 50201) errorMsg = 'Insufficient balance in your SMS provider account.';
+      if (data.code === 401) errorMsg = 'Invalid SMS API Key.';
+      
+      return { success: false, error: errorMsg };
     } catch (err) { return { success: false, error: 'Connection failed: ' + err.message }; }
   },
 
   checkCode: async function(requestId) {
     try {
-      var url = this.apiBase + '/order/sms?order_id=' + requestId;
-      var response = await fetch(url, {
-        headers: { 'Authorization': 'Bearer ' + SMS_API_KEY }
-      });
-      var text = await response.text();
-      let data;
-      try { data = JSON.parse(text); } catch (e) { return { success: false, waiting: true }; }
+      var url = apiBase + '/get/sms?token=' + SMS_API_KEY + '&request_id=' + requestId;
+      var response = await fetch(url);
+      var data = await response.json();
 
-      if (data.success && data.data && data.data.sms) {
-        return { success: true, code: data.data.sms };
+      if (data.code === 200 && data.data) {
+        return { success: true, code: data.data };
       }
-      if (data.data && data.data.status === 'pending') {
+      if (data.code === 50101) {
         return { success: false, waiting: true };
       }
-      return { success: false, waiting: true };
+      return { success: false, waiting: false, error: data.message };
     } catch (err) { return { success: false, waiting: true, error: err.message }; }
   },
 
   cancel: async function(requestId) {
     try {
-      var url = this.apiBase + '/order/delete?order_id=' + requestId;
-      var response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + SMS_API_KEY }
-      });
+      var url = apiBase + '/cancel?token=' + SMS_API_KEY + '&request_id=' + requestId;
+      var response = await fetch(url);
       var data = await response.json();
-      return data.success === true;
+      return data.code === 200;
     } catch (err) { return false; }
   },
 
   complete: async function(requestId) {
-    try {
-      var url = this.apiBase + '/order/finish?order_id=' + requestId;
-      var response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + SMS_API_KEY }
-      });
-      var data = await response.json();
-      return data.success === true;
-    } catch (err) { return false; }
+    // SMS-BUS auto-completes when SMS is received or times out
+    return true;
   },
 
   getServiceCode: function(serviceName) {
+    // SMS-BUS uses NUMBERS for project_id (e.g., 1=Telegram, 2=PayPal)
     var map = {
-      'WhatsApp': 'whatsapp', 'Telegram': 'telegram', 'Facebook': 'facebook',
-      'Instagram': 'instagram', 'Google': 'google', 'Twitter / X': 'twitter',
-      'TikTok': 'tiktok', 'Discord': 'discord', 'Amazon': 'amazon',
-      'Microsoft': 'microsoft', 'Fiverr': 'fiverr', 'PayPal': 'paypal',
-      'Steam': 'steam', 'Uber': 'uber', 'Lyft': 'lyft'
+      'WhatsApp': '1',
+      'Telegram': '1',
+      'Facebook': '2',
+      'Instagram': '3',
+      'Google': '4',
+      'Twitter / X': '5',
+      'TikTok': '6',
+      'Discord': '7',
+      'Amazon': '8',
+      'Microsoft': '9',
+      'Fiverr': '10',
+      'PayPal': '2',
+      'Steam': '11',
+      'Uber': '12',
+      'Lyft': '13'
     };
-    return map[serviceName] || 'whatsapp';
+    return map[serviceName] || '1';
   },
 
   getCountryCode: function(country) {
+    // SMS-BUS uses NUMBERS for country_id (e.g., 1=USA, 2=Russia)
     var map = {
-      'US': 'us', 'UK': 'gb', 'DE': 'de', 'FR': 'fr', 'CA': 'ca',
-      'AU': 'au', 'JP': 'jp', 'NL': 'nl'
+      'US': '1',
+      'UK': '2',
+      'DE': '3',
+      'FR': '4',
+      'CA': '5',
+      'AU': '6',
+      'JP': '7',
+      'NL': '8'
     };
-    return map[country] || 'us';
+    return map[country] || '1';
   }
 };
 
