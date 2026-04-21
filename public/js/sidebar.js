@@ -31,9 +31,8 @@ function renderSidebar(filter = '') {
       <div class="service-icon ${service.iconClass}"><i class="${service.icon}"></i></div>
       <div class="service-info">
         <div class="service-name">${service.name}</div>
-        ${service.category === 'recommended'
-          ? `<div class="service-region">${service.region}</div><div class="service-available">${service.available !== undefined ? service.available.toLocaleString() + ' pc' : ''}</div>`
-          : `<div class="service-available">${service.available !== undefined ? service.available.toLocaleString() + ' pc' : service.region}</div>`}
+        <div class="service-region">${service.region}</div>
+        ${service.available !== undefined && service.available !== null ? '<div class="service-available">' + service.available.toLocaleString() + ' pc</div>' : ''}
       </div>
       <div class="service-price">$${service.price.toFixed(2)}</div>
     `;

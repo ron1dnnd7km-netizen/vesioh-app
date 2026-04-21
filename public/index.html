@@ -21,78 +21,76 @@
   <div id="appPages" style="display:none;">
 
     <!-- ===== TOP NAV ===== -->
-   <nav class="top-nav">
-  <div class="nav-left">
-    <!-- Centered logo: shown ONLY on mobile via CSS -->
-    <div class="nav-center-logo" style="display:none;">
-      <div class="logo-icon"><i class="fas fa-comment-dots"></i></div>
-      SMS Virtual <span>Code</span>
-    </div>
+    <nav class="top-nav">
+      <div class="nav-left">
+        <!-- Centered logo: shown ONLY on mobile via CSS -->
+        <div class="nav-center-logo" style="display:none;">
+          <div class="logo-icon"><i class="fas fa-comment-dots"></i></div>
+          SMS Virtual <span>Code</span>
+        </div>
 
-    <!-- Desktop logo: hidden on mobile via CSS -->
-    <div class="logo">
-      <div class="logo-icon"><i class="fas fa-comment-dots"></i></div>
-      SMS Virtual <span>Code</span>
-    </div>
+        <!-- Desktop logo: hidden on mobile via CSS -->
+        <div class="logo">
+          <div class="logo-icon"><i class="fas fa-comment-dots"></i></div>
+          SMS Virtual <span>Code</span>
+        </div>
 
-    <div class="nav-links">
-      <button type="button" class="nav-link active" data-page="numbers">Home</button>
-      <button type="button" class="nav-link" data-page="history">History</button>
-      <button type="button" class="nav-link" data-page="help">Help</button>
-      <button type="button" class="nav-link" data-page="contacts">Contacts</button>
-      <button type="button" class="nav-link" data-page="deposit" style="color:var(--accent);">
-        <i class="fas fa-plus" style="font-size:10px;margin-right:4px;"></i> Add Funds
-      </button>
-    </div>
-  </div>
-
-  <div class="nav-right">
-    <!-- Balance first -->
-    <div class="balance-badge" id="balanceBadge" style="cursor:pointer;" onclick="navigateTo('deposit')" role="button" tabindex="0" aria-label="Go to deposit page">
-      <i class="fas fa-wallet"></i>
-      <span id="balanceAmount">$0.00</span>
-    </div>
-
-    <!-- Notification after balance -->
-    <button type="button" class="notification-btn" aria-label="Notifications">
-      <i class="fas fa-bell"></i>
-      <span class="dot"></span>
-    </button>
-
-    <div class="language-menu">
-      <button type="button" class="language-btn" id="desktopLangBtn" aria-label="Language">
-        <span class="language-flag" id="desktopLangFlag">🇬🇧</span>
-        <span class="language-label" id="desktopLangLabel">EN</span>
-        <i class="fas fa-chevron-down"></i>
-      </button>
-      <div class="language-dropdown" id="desktopLangDrop">
-        <button type="button" onclick="changeLanguage('en')"><span>🇬🇧</span> English</button>
-        <button type="button" onclick="changeLanguage('zh')"><span>🇨🇳</span> Chinese</button>
-        <button type="button" onclick="changeLanguage('ru')"><span>🇷🇺</span> Russian</button>
+        <div class="nav-links">
+          <button type="button" class="nav-link active" data-page="numbers">Home</button>
+          <button type="button" class="nav-link" data-page="history">History</button>
+          <button type="button" class="nav-link" data-page="help">Help</button>
+          <button type="button" class="nav-link" data-page="contacts">Contacts</button>
+          <button type="button" class="nav-link" data-page="deposit" style="color:var(--accent);">
+            <i class="fas fa-plus" style="font-size:10px;margin-right:4px;"></i> Add Funds
+          </button>
+        </div>
       </div>
-    </div>
 
-    <div class="user-menu">
-      <div class="user-info">
-        <div class="user-avatar" id="userAvatarDisplay">AS</div>
-        <span class="user-email" id="userEmailDisplay">user@email.com</span>
-        <i class="fas fa-chevron-down"></i>
-      </div>
-      <div class="user-dropdown">
-        <button type="button" onclick="navigateTo('api')"><i class="fas fa-code"></i> API</button>
-        <button type="button" onclick="navigateTo('settings')"><i class="fas fa-cog"></i> Settings</button>
-        <div class="divider"></div>
-        <button type="button" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
-        <button type="button" onclick="deleteAccount()"><i class="fas fa-trash"></i> Delete Account</button>
-      </div>
-    </div>
+      <div class="nav-right">
+        <!-- Balance first -->
+        <div class="balance-badge" id="balanceBadge" style="cursor:pointer;" onclick="navigateTo('deposit')" role="button" tabindex="0" aria-label="Go to deposit page">
+          <i class="fas fa-wallet"></i>
+          <span id="balanceAmount">$0.00</span>
+        </div>
 
-    <!-- Hamburger: shown ONLY on mobile -->
-    <button type="button" class="hamburger" id="hamburger" aria-label="Toggle menu">
-      <i class="fas fa-bars"></i>
-    </button>
-  </div>
-</nav>
+        <!-- Notification after balance -->
+        <button type="button" class="notification-btn" aria-label="Notifications">
+          <i class="fas fa-bell"></i>
+          <span class="dot"></span>
+        </button>
+
+        <div class="language-menu">
+          <button type="button" class="language-btn" id="desktopLangBtn" aria-label="Language">
+            <span class="language-flag" id="desktopLangFlag">🇬🇧</span>
+            <i class="fas fa-chevron-down" style="font-size:10px;margin-left:2px;"></i>
+          </button>
+          <div class="language-dropdown" id="desktopLangDrop">
+            <button type="button" onclick="changeLanguage('en')"><span>🇬🇧</span> English</button>
+            <button type="button" onclick="changeLanguage('zh')"><span>🇨🇳</span> 中国人</button>
+            <button type="button" onclick="changeLanguage('ru')"><span>🇷🇺</span> 俄语</button>
+          </div>
+        </div>
+
+        <div class="user-menu">
+          <div class="user-info">
+            <div class="user-avatar" id="userAvatarDisplay">AS</div>
+            <span class="user-email" id="userEmailDisplay">user@email.com</span>
+            <i class="fas fa-chevron-down"></i>
+          </div>
+          <div class="user-dropdown">
+            <button type="button" onclick="navigateTo('settings')"><i class="fas fa-cog"></i> Settings</button>
+            <div class="divider"></div>
+            <button type="button" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+            <button type="button" onclick="deleteAccount()"><i class="fas fa-trash"></i> Delete Account</button>
+          </div>
+        </div>
+
+        <!-- Hamburger: shown ONLY on mobile -->
+        <button type="button" class="hamburger" id="hamburger" aria-label="Toggle menu">
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+    </nav>
 
     <!-- ===== MAIN LAYOUT ===== -->
     <div class="main-layout">
@@ -101,36 +99,38 @@
         <!-- ========== MOBILE DROPDOWN MENU (hidden on desktop via CSS) ========== -->
         <div class="mobile-dropdown-content">
           <ul class="mobile-menu-list">
-            <li><button onclick="handleNav('numbers')"><i class="fas fa-home"></i> Home</button></li>
-            <li><button onclick="handleNav('deposit')"><i class="fas fa-wallet"></i> Add Funds</button></li>
-            <li><button onclick="handleNav('history')"><i class="fas fa-clock-rotate-left"></i> History</button></li>
-            <li><button onclick="handleNav('api')"><i class="fas fa-code"></i> API</button></li>
-            <li><button onclick="handleNav('settings')"><i class="fas fa-gift"></i> Referral Program</button></li>
-            <li><button onclick="handleNav('help')"><i class="fas fa-circle-question"></i> Help Center</button></li>
-            <li><button onclick="handleNav('contacts')"><i class="fas fa-envelope"></i> Contacts</button></li>
+            <!-- Main Navigation -->
+            <li class="menu-section-title">Menu</li>
+            <li><button type="button" class="menu-nav-btn" data-page="numbers" onclick="handleNav('numbers')"><i class="fas fa-home"></i> Home</button></li>
+            <li><button type="button" class="menu-nav-btn" data-page="deposit" onclick="handleNav('deposit')"><i class="fas fa-wallet"></i> Add Funds</button></li>
+            <li><button type="button" class="menu-nav-btn" data-page="history" onclick="handleNav('history')"><i class="fas fa-clock-rotate-left"></i> History</button></li>
+            <li><button type="button" class="menu-nav-btn" data-page="settings" onclick="handleNav('settings')"><i class="fas fa-gift"></i> Referral Program</button></li>
+            <li><button type="button" class="menu-nav-btn" data-page="help" onclick="handleNav('help')"><i class="fas fa-circle-question"></i> Help Center</button></li>
+            <li><button type="button" class="menu-nav-btn" data-page="contacts" onclick="handleNav('contacts')"><i class="fas fa-envelope"></i> Contacts</button></li>
             
             <li class="menu-divider"></li>
             
+            <!-- Language Section -->
+            <li class="menu-section-title">Settings</li>
             <li class="language-item">
-              <button id="mobileLangBtn" onclick="toggleMobileLang()">
-                <i class="fas fa-globe"></i> 🌍 Language
-                <i class="fas fa-chevron-down" style="margin-left:auto;"></i>
+              <button type="button" class="menu-lang-btn" id="mobileLangBtn" onclick="toggleMobileLang()">
+                <span class="language-flag" id="mobileLangFlag" style="font-size:20px;">🇬🇧</span>
+                <span>Language</span>
+                <i class="fas fa-chevron-down language-chevron"></i>
               </button>
               <div class="language-submenu" id="mobileLangDrop">
-                <button onclick="setMobileLang('English','🇺🇸')">🇺🇸 English</button>
-                <button onclick="setMobileLang('العربية','🇸🇦')">🇸🇦 العربية</button>
-                <button onclick="setMobileLang('Français','🇫🇷')">🇫🇷 Français</button>
-                <button onclick="setMobileLang('Español','🇪🇸')">🇪🇸 Español</button>
-                <button onclick="setMobileLang('Deutsch','🇩🇪')">🇩🇪 Deutsch</button>
-                <button onclick="setMobileLang('Türkçe','🇹🇷')">🇹🇷 Türkçe</button>
+                <button type="button" onclick="changeLanguage('en')"><span>🇬🇧</span> English</button>
+                <button type="button" onclick="changeLanguage('zh')"><span>🇨🇳</span> 中国人</button>
+                <button type="button" onclick="changeLanguage('ru')"><span>🇷🇺</span> 俄语</button>
               </div>
             </li>
             
             <li class="menu-divider"></li>
             
+            <!-- Account Section -->
             <li class="email-item" id="mobileEmail">user@email.com</li>
-            <li><button onclick="handleLogout()" class="logout-btn"><i class="fas fa-right-from-bracket"></i> Logout</button></li>
-            <li><button onclick="handleDeleteAccount()" class="delete-btn"><i class="fas fa-trash-can"></i> Delete Account</button></li>
+            <li><button type="button" onclick="handleLogout()" class="logout-btn"><i class="fas fa-right-from-bracket"></i> Logout</button></li>
+            <li><button type="button" onclick="handleDeleteAccount()" class="delete-btn"><i class="fas fa-trash-can"></i> Delete Account</button></li>
           </ul>
         </div>
         <!-- ========== END MOBILE DROPDOWN MENU ========== -->

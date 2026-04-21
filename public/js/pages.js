@@ -1,40 +1,45 @@
 function renderNumbersPage(main) {
   var activeOnlyNumbers = activeNumbers ? activeNumbers.filter(function(n) { return n.status === 'waiting' || n.status === 'received'; }) : [];
   var totalActive = activeOnlyNumbers.length;
-  var waitingNumbers = activeOnlyNumbers;
-  var waitingCount = waitingNumbers.length;
+  var waitingNumbers = activeNumbers;
 
   var activeNumbersHTML = totalActive > 0
     ? waitingNumbers.map(renderActiveNumberCard).join('')
     : '<div style="padding:22px;border:1px dashed var(--border);border-radius:14px;color:var(--text-secondary);font-size:14px;">No active numbers yet. Buy one from below.</div>';
 
-  // ====== ADDED THE SERVICE GRID HERE! ======
-  var serviceGridHTML = '<div style="margin-top:24px;">' +
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">' +
-      '<h2 style="font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px;">' +
-        '<i class="fas fa-shopping-cart" style="color:var(--accent);font-size:14px;"></i> Get Virtual Number</h2>' +
+  // ====== MOBILE SEARCH BAR ======
+  var mobileSearchHTML = '<div class="mobile-search-wrapper" style="margin-bottom:20px;">' +
+    '<div style="position:relative;">' +
+      '<i class="fas fa-search" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:13px;"></i>' +
+      '<input type="text" id="mobileServiceSearch" placeholder="Search services..." style="width:100%;padding:12px 14px 12px 40px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;color:var(--text-primary);font-size:14px;font-family:inherit;outline:none;transition:all 0.2s;" onfocus="this.style.borderColor=\'var(--accent)\';this.style.boxShadow=\'0 0 0 3px var(--accent-dim)\'" onblur="this.style.borderColor=\'var(--border)\';this.style.boxShadow=\'none\'" oninput="filterMobileServices(this.value)">' +
     '</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;">' +
+  '</div>';
+
+  // ====== SERVICE GRID (Now First!) ======
+  var serviceGridHTML = '<div id="mobileServiceGridWrapper" style="margin-bottom:28px;">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">' +
+      '<h2 style="font-size:18px;font-weight:700;display:flex;align-items:center;gap:10px;">' +
+        '<i class="fas fa-shopping-cart" style="color:var(--accent);font-size:16px;"></i> Get Virtual Number</h2>' +
+    '</div>' +
+    '<div id="mobileServiceGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;">' +
       getDashboardServiceListHTML() +
     '</div>' +
   '</div>';
 
-  // ====== THE FIX: ADDED main.innerHTML = AND + SIGNS ======
-  main.innerHTML =
-
-    /* ===== NUMBER & CODE COMBINED ===== */
-    '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);margin-bottom:28px;">' +
-      '<div>' +
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">' +
-          '<h2 style="font-size:18px;font-weight:700;display:flex;align-items:center;gap:10px;">' +
-            '<i class="fas fa-phone-alt" style="color:var(--accent);font-size:15px;"></i> Active Numbers</h2>' +
-          '<span style="font-size:12px;padding:3px 10px;border-radius:8px;font-weight:600;background:var(--accent-dim);color:var(--accent);">' + totalActive + ' active</span>' +
-        '</div>' +
-        '<div style="display:flex;flex-direction:column;gap:12px;">' + activeNumbersHTML + '</div>' +
+  // ====== ACTIVE NUMBERS (Now Second!) ======
+  var activeSectionHTML = '<div id="activeNumbersSection" style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);margin-bottom:28px;">' +
+    '<div>' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">' +
+        '<h2 style="font-size:18px;font-weight:700;display:flex;align-items:center;gap:10px;">' +
+          '<i class="fas fa-phone-alt" style="color:var(--accent);font-size:15px;"></i> Active Numbers</h2>' +
+        '<span style="font-size:12px;padding:3px 10px;border-radius:8px;font-weight:600;background:var(--accent-dim);color:var(--accent);">' + totalActive + ' active</span>' +
       '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:12px;">' + activeNumbersHTML + '</div>' +
     '</div>' +
+  '</div>';
 
-    /* ===== IMPORTANT INFO SECTION ===== */
+  // ====== INFO SECTIONS (At the bottom) ======
+  var infoSectionsHTML = 
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-bottom:28px;">' +
       '<div style="background:rgba(13,155,122,0.08);border:1px solid rgba(13,155,122,0.2);border-radius:12px;padding:16px;box-shadow:var(--shadow-sm);">' +
         '<h3 style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--accent);">No Cancellations Within 45s</h3>' +
@@ -49,18 +54,37 @@ function renderNumbersPage(main) {
         '<p style="font-size:12px;color:var(--text-secondary);line-height:1.5;">Funds will be automatically refunded to your wallet if the request times out or is canceled.</p>' +
       '</div>' +
     '</div>' +
-
-    /* ===== INFO SECTION ===== */
     '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:28px;box-shadow:var(--shadow-sm);margin-bottom:28px;">' +
       '<h2 style="font-size:22px;font-weight:700;margin-bottom:16px;">Why use temporary phone numbers</h2>' +
       '<p style="font-size:14px;color:var(--text-secondary);line-height:1.8;margin-bottom:14px;">When creating accounts, most websites require a valid mobile number. Temporary numbers let you create and manage multiple accounts without limitations.</p>' +
       '<p style="font-size:14px;color:var(--text-secondary);line-height:1.8;margin-bottom:14px;"><strong>Protect your privacy</strong> — Your personal phone number can reveal sensitive details. Using temporary numbers helps keep your identity secure.</p>' +
       '<p style="font-size:14px;color:var(--text-secondary);line-height:1.8;"><strong>Bypass regional restrictions</strong> — Temporary numbers from different countries allow you to register on platforms without geographic barriers.</p>' +
-    '</div>' +
+    '</div>';
 
-    /* ===== THIS ADDS THE BUTTONS TO THE PAGE ===== */
-    serviceGridHTML;
+  // ====== FINAL RENDER (New Order!) ======
+  main.innerHTML = 
+    mobileSearchHTML + 
+    serviceGridHTML + 
+    activeSectionHTML + 
+    infoSectionsHTML;
 }
+
+/* ===== MOBILE SEARCH FILTER ===== */
+window.filterMobileServices = function(query) {
+  query = query.toLowerCase().trim();
+  var grid = document.getElementById('mobileServiceGrid');
+  if (!grid) return;
+
+  var items = grid.children;
+  for (var i = 0; i < items.length; i++) {
+    var serviceName = items[i].textContent.toLowerCase();
+    if (query === '' || serviceName.indexOf(query) !== -1) {
+      items[i].style.display = ''; 
+    } else {
+      items[i].style.display = 'none'; 
+    }
+  }
+};
 
 /* ===== Card for combined Number + Code display ===== */
 function renderActiveNumberCard(n) {
@@ -221,34 +245,28 @@ function renderNumberCard(n) {
     '<div class="number-actions">' + actions + '</div></div></div>';
 }
 
+/* ===== DYNAMIC SERVICE GRID (Matches desktop sidebar data) ===== */
 function getDashboardServiceListHTML() {
-  var items = [
-    { name: 'WhatsApp', icon: 'fab fa-whatsapp', color: '#25d366', bg: 'rgba(37,211,102,0.1)', price: '0.70', id: 'wa', region: 'Any' },
-    { name: 'Telegram', icon: 'fab fa-telegram-plane', color: '#24a1de', bg: 'rgba(36,161,222,0.1)', price: '0.45', id: 'tg', region: 'Any' },
-    { name: 'Facebook', icon: 'fab fa-facebook-f', color: '#1877f2', bg: 'rgba(24,119,242,0.1)', price: '0.50', id: 'fb', region: 'Any' },
-    { name: 'Instagram', icon: 'fab fa-instagram', color: '#e1306c', bg: 'rgba(225,48,108,0.1)', price: '0.60', id: 'ig', region: 'Any' },
-    { name: 'Google', icon: 'fab fa-google', color: '#4285f4', bg: 'rgba(66,133,244,0.1)', price: '0.35', id: 'google', region: 'Any' },
-    { name: 'Twitter / X', icon: 'fab fa-x-twitter', color: '#1da1f2', bg: 'rgba(29,161,242,0.1)', price: '0.55', id: 'tw', region: 'Any' },
-    { name: 'TikTok', icon: 'fab fa-tiktok', color: '#cc0044', bg: 'rgba(255,0,80,0.06)', price: '0.20', id: 'tk', region: 'Any' },
-    { name: 'Discord', icon: 'fab fa-discord', color: '#5865f2', bg: 'rgba(88,101,242,0.1)', price: '0.40', id: 'discord', region: 'Any' },
-    { name: 'Amazon', icon: 'fab fa-amazon', color: '#e68a00', bg: 'rgba(255,153,0,0.1)', price: '0.90', id: 'amz', region: 'Any' },
-    { name: 'Microsoft', icon: 'fab fa-microsoft', color: '#0078d4', bg: 'rgba(0,120,212,0.1)', price: '0.50', id: 'microsoft', region: 'Any' },
-    { name: 'Fiverr', icon: 'fab fa-font-awesome', color: '#00af50', bg: 'rgba(0,175,80,0.1)', price: '0.80', id: 'fiverr', region: 'Any' },
-    { name: 'PayPal', icon: 'fab fa-paypal', color: '#003087', bg: 'rgba(0,48,135,0.1)', price: '0.85', id: 'pp', region: 'Any' }
-  ];
-  return items.map(function(s) {
-    var service = services.find(function(x) { return x.id === s.id; }) || {};
-    var availableText = service.available !== undefined ? service.available.toLocaleString() + ' pc' : '';
+  if (typeof services === 'undefined' || !services || services.length === 0) {
+    return '<div style="padding:20px;text-align:center;color:var(--danger);font-size:14px;">Services data not loaded. Check data.js</div>';
+  }
+  
+  return services.map(function(s) {
+    var name = s.name || 'Unknown';
+    var icon = s.icon || 'fas fa-mobile-alt';
+    var price = (s.price || 0).toFixed(2);
+    var id = s.id || 'other';
+    var availableText = (s.available !== undefined && s.available !== null) ? s.available.toLocaleString() + ' pc' : '';
+    
     return '<div style="padding:16px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;text-align:center;box-shadow:var(--shadow-sm);cursor:pointer;transition:all 0.2s;" ' +
       'onmouseover="this.style.boxShadow=\'var(--shadow-md)\';this.style.borderColor=\'var(--accent)\'" ' +
       'onmouseout="this.style.boxShadow=\'var(--shadow-sm)\';this.style.borderColor=\'var(--border)\'" ' +
-      'onclick="openModalById(\'' + s.id + '\')">' +
-      '<div style="width:40px;height:40px;border-radius:10px;background:' + s.bg + ';display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:16px;color:' + s.color + ';">' +
-      '<i class="' + s.icon + '"></i></div>' +
-      '<div style="font-size:12px;font-weight:600;margin-bottom:6px;">' + s.name + '</div>' +
-      '<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">' + s.region + '</div>' +
-      (availableText ? '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;">' + availableText + '</div>' : '') +
-      '<div style="font-size:13px;font-weight:700;color:var(--accent);">$' + s.price + '</div></div>';
+      'onclick="openModalById(\'' + id + '\')">' +
+      '<div class="service-icon ' + id + '" style="width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:16px;">' +
+      '<i class="' + icon + '"></i></div>' +
+      '<div style="font-size:12px;font-weight:600;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + name + '</div>' +
+      (availableText ? '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + availableText + '</div>' : '') +
+      '<div style="font-size:13px;font-weight:700;color:var(--accent);">$' + price + '</div></div>';
   }).join('');
 }
 
@@ -258,7 +276,6 @@ function renderHistoryPage(main) {
     rows = '<div class="empty-state"><i class="fas fa-history"></i><h3>No history yet</h3><p>Your SMS code history will appear here</p></div>';
   } else {
     rows = historyData.map(function(h) {
-      // Look up service from services array
       var service = services.find(function(s) { return s.name.toLowerCase() === h.service_name.toLowerCase(); });
       var countryFlag = '🏳️';
       var serviceIcon = service ? service.icon : 'fas fa-mobile-alt';
@@ -357,19 +374,6 @@ function copyReferralLink() {
     return;
   }
   navigator.clipboard.writeText(el.dataset.link).then(function() { showToast('Referral link copied', 'success'); }).catch(function() { showToast('Failed to copy', 'error'); });
-}
-
-function renderApiPage(main) {
-  main.innerHTML = '<div class="page-header"><h1 class="page-title">API Documentation</h1></div>' +
-    '<div class="stat-card" style="max-width:800px;">' +
-    '<h3 style="font-size:15px;font-weight:600;margin-bottom:16px;">Quick Start</h3>' +
-    '<p style="font-size:13px;color:var(--text-secondary);line-height:1.7;margin-bottom:20px;">Integrate SMS Virtual Code into your application using our RESTful API.</p>' +
-    '<div class="code-block" style="margin-bottom:16px;"><pre style="color:var(--accent);">GET /api/v1/numbers/available\nAuthorization: Bearer YOUR_API_KEY\n\n{\n  "service": "whatsapp",\n  "country": "US"\n}</pre></div>' +
-    '<div class="code-block" style="margin-bottom:16px;"><pre style="color:var(--info);">POST /api/v1/numbers/request\nAuthorization: Bearer YOUR_API_KEY\n\n{\n  "service": "whatsapp",\n  "country": "US"\n}</pre></div>' +
-    '<div class="code-block"><pre style="color:var(--warning);">GET /api/v1/sms/{request_id}\n\n{\n  "code": "482910",\n  "text": "Your WhatsApp code is 482910"\n}</pre></div>' +
-    '<div style="margin-top:20px;display:flex;gap:10px;">' +
-    '<button class="btn btn-primary" onclick="showToast(\'API key copied\',\'success\')"><i class="fas fa-key"></i> Copy API Key</button>' +
-    '<button class="btn btn-secondary" onclick="showToast(\'Full docs coming soon\',\'info\')"><i class="fas fa-book"></i> Full Docs</button></div></div>';
 }
 
 function renderHelpPage(main) {
@@ -510,7 +514,7 @@ function renderDepositPage(main) {
     '<div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;">' +
     '<button class="btn btn-outline dep-amt" data-amount="5" onclick="selectDepositAmount(5,this)" style="padding:12px 18px;font-size:14px;">US$5</button>' +
     '<button class="btn btn-outline dep-amt" data-amount="10" onclick="selectDepositAmount(10,this)" style="padding:12px 18px;font-size:14px;">US$10</button>' +
-    '<button class="btn btn-primary dep-amt" data-amount="20" onclick="selectDepositAmount(20,this)" style="padding:12px 18px;font-size:14px;">US$20</button>' +
+    '<button class="btn btn-outline dep-amt" data-amount="20" onclick="selectDepositAmount(20,this)" style="padding:12px 18px;font-size:14px;">US$20</button>' +
     '<button class="btn btn-outline dep-amt" data-amount="50" onclick="selectDepositAmount(50,this)" style="padding:12px 18px;font-size:14px;">US$50</button>' +
     '<button class="btn btn-outline dep-amt" data-amount="100" onclick="selectDepositAmount(100,this)" style="padding:12px 18px;font-size:14px;">US$100</button>' +
     '</div></div>' +
@@ -652,6 +656,7 @@ async function loadDepositHistory() {
       container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">No deposits yet</div>';
       return;
     }
+    window.depositHistoryData = deposits;
     container.innerHTML = deposits.map(function(d) {
       var statusColor = d.status === 'completed' ? 'var(--accent)' : d.status === 'pending' ? 'var(--warning)' : 'var(--danger)';
       var statusText = d.status === 'completed' ? 'Completed' : d.status === 'pending' ? 'Pending' : 'Failed';
@@ -712,6 +717,7 @@ window.openModalById = function(serviceId) {
         '<button class="btn btn-primary" id="finalBuyBtn" onclick="executeBuyNumber()"><i class="fas fa-phone-alt"></i> Get Number</button>' +
       '</div>' +
     '</div>' +
+  '</div>' +
   '</div>';
 
   var existing = document.getElementById('buyModalOverlay');
@@ -732,7 +738,6 @@ window.executeBuyNumber = function() {
     return;
   }
 
-  // ===== FIX: CORRECTLY DEFINE VARIABLES =====
   var serviceCode = window.selectedBuyService.id;
   var serviceName = window.selectedBuyService.name;
   var servicePrice = window.selectedBuyService.price;
@@ -763,13 +768,23 @@ window.executeBuyNumber = function() {
       showToast(data.error, 'error');
     } else {
       showToast('Number purchased successfully!', 'success');
-      closeBuyModal();
-      if (typeof loadBalance === 'function') loadBalance();
-      if (typeof loadNumbers === 'function') {
-         loadNumbers().then(function() {
-            if (typeof renderMainContent === 'function') renderMainContent();
-         });
-      }
+      // ✅ NEW - scrolls to active numbers after purchase
+closeBuyModal();
+if (typeof loadBalance === 'function') loadBalance();
+if (typeof loadNumbers === 'function') {
+   loadNumbers().then(function() {
+      if (typeof renderMainContent === 'function') renderMainContent();
+      
+      // Auto-scroll to Active Numbers section on mobile
+      // ✅ NEW (uses the ID)
+setTimeout(function() {
+  var activeSection = document.getElementById('activeNumbersSection');
+  if (activeSection) {
+    activeSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}, 300);
+   });
+}
     }
   })
   .catch(function(err) {
