@@ -1,3 +1,4 @@
+/* v2 */
 // ====== SAFE GLOBAL STATE ======
 if (!window.currentPage) window.currentPage = 'numbers';
 if (!window.activeNumbers) window.activeNumbers = [];
@@ -19,38 +20,112 @@ document.addEventListener('DOMContentLoaded', function() {
   bootSequence();
 });
 
-// ====== MOBILE SIDEBAR ======
+// ====== MOBILE SIDEBAR (dropdown style) ======
 function initSidebar() {
   var hamburger = document.getElementById('hamburger');
-  var sidebar = document.querySelector('.sidebar');
+  var sidebar = document.getElementById('sidebar');
+  var overlay = document.getElementById('sidebarOverlay');
   if (!hamburger || !sidebar) return;
 
-  var overlay = document.createElement('div');
-  overlay.className = 'sidebar-overlay';
-  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:998;display:none;';
-  document.body.appendChild(overlay);
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'sidebarOverlay';
+    overlay.className = 'sidebar-overlay';
+    document.body.appendChild(overlay);
+  }
 
-  hamburger.addEventListener('click', function() {
-    var emailEl = document.getElementById('mobileSidebarEmail');
-    if (emailEl && typeof getUserEmail === 'function') emailEl.textContent = getUserEmail();
-    sidebar.classList.add('active');
-    overlay.style.display = 'block';
+  hamburger.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (sidebar.classList.contains('active')) {
+      closeMobileSidebar();
+    } else {
+      var emailEl = document.getElementById('mobileEmail');
+      if (emailEl && typeof getUserEmail === 'function') emailEl.textContent = getUserEmail();
+      sidebar.classList.add('active');
+      overlay.style.display = 'block';
+      requestAnimationFrame(function() { overlay.classList.add('visible'); });
+    }
   });
 
   overlay.addEventListener('click', closeMobileSidebar);
+
+  var mobileLangBtn = document.getElementById('mobileLangBtn');
+  var mobileLangDrop = document.getElementById('mobileLangDrop');
+  if (mobileLangBtn && mobileLangDrop) {
+    mobileLangBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var isOpen = mobileLangDrop.classList.contains('show');
+      mobileLangDrop.classList.toggle('show', !isOpen);
+      mobileLangBtn.classList.toggle('open', !isOpen);
+    });
+  }
+
+  if (sidebar) {
+    sidebar.addEventListener('click', function(e) {
+      if (mobileLangBtn && mobileLangDrop) {
+        if (!mobileLangBtn.contains(e.target) && !mobileLangDrop.contains(e.target)) {
+          mobileLangDrop.classList.remove('show');
+          mobileLangBtn.classList.remove('open');
+        }
+      }
+    });
+  }
 }
 
 function closeMobileSidebar() {
-  var sidebar = document.querySelector('.sidebar');
-  var overlay = document.querySelector('.sidebar-overlay');
+  var sidebar = document.getElementById('sidebar');
+  var overlay = document.getElementById('sidebarOverlay');
   if (sidebar) sidebar.classList.remove('active');
-  if (overlay) overlay.style.display = 'none';
+  if (overlay) {
+    overlay.classList.remove('visible');
+    setTimeout(function() { overlay.style.display = 'none'; }, 200);
+  }
+  var mobileLangDrop = document.getElementById('mobileLangDrop');
+  var mobileLangBtn = document.getElementById('mobileLangBtn');
+  if (mobileLangDrop) mobileLangDrop.classList.remove('show');
+  if (mobileLangBtn) mobileLangBtn.classList.remove('open');
 }
+
+// ====== Aliases for mobile HTML onclick handlers ======
+window.handleNav = function(page) { goToPage(page); };
+window.closeSidebar = function() { closeMobileSidebar(); };
+
+// ====== Mobile language setter ======
+window.setMobileLang = function(name, flag) {
+  var mName = document.getElementById('mobileLangName');
+  if (mName) mName.textContent = name;
+
+  var mobileLangDrop = document.getElementById('mobileLangDrop');
+  var mobileLangBtn = document.getElementById('mobileLangBtn');
+  if (mobileLangDrop) mobileLangDrop.classList.remove('show');
+  if (mobileLangBtn) mobileLangBtn.classList.remove('open');
+
+  var dFlag = document.getElementById('desktopLangFlag');
+  var dLabel = document.getElementById('desktopLangLabel');
+  if (dFlag) dFlag.textContent = flag;
+  if (dLabel) dLabel.textContent = name;
+
+  var langMap = { 'English': 'en', 'العربية': 'ar', 'Français': 'fr', 'Español': 'es', 'Deutsch': 'de', 'Türkçe': 'tr' };
+  var langCode = langMap[name] || 'en';
+  changeLanguage(langCode);
+
+  closeMobileSidebar();
+};
+
+window.toggleMobileLang = function() {
+  var mobileLangBtn = document.getElementById('mobileLangBtn');
+  var mobileLangDrop = document.getElementById('mobileLangDrop');
+  if (!mobileLangBtn || !mobileLangDrop) return;
+  var isOpen = mobileLangDrop.classList.contains('show');
+  mobileLangDrop.classList.toggle('show', !isOpen);
+  mobileLangBtn.classList.toggle('open', !isOpen);
+};
 
 // ====== NAVIGATION ======
 function getPageFromHash() {
   var hash = window.location.hash.replace('#', '').trim();
-  return hash ? hash : 'numbers';
+  var pageMap = { 'numbers': 'numbers', 'home': 'numbers', 'add-funds': 'deposit', 'deposit': 'deposit', 'history': 'history', 'api': 'api', 'referral': 'settings', 'settings': 'settings', 'help': 'help', 'contacts': 'contacts' };
+  return pageMap[hash] || hash || 'numbers';
 }
 
 function updateHash(page) {
@@ -61,21 +136,25 @@ function updateHash(page) {
 
 function goToPage(page) {
   closeMobileSidebar();
+  var pageMap = { 'home': 'numbers', 'add-funds': 'deposit' };
+  page = pageMap[page] || page;
   window.currentPage = page;
   updateHash(page);
 
   document.querySelectorAll('.nav-link').forEach(function(l) { l.classList.remove('active'); });
-  var btn = document.querySelector("[data-page='" + page + "']");
+  var btn = document.querySelector(".nav-link[data-page='" + page + "']");
   if (btn) btn.classList.add('active');
-  
+
+  document.querySelectorAll('.dropdown-menu button[data-page]').forEach(function(b) { b.classList.remove('active-link'); });
+  var mobileBtn = document.querySelector(".dropdown-menu button[data-page='" + page + "']");
+  if (mobileBtn) mobileBtn.classList.add('active-link');
+
   Promise.resolve(preLoadPageData(page)).then(function() {
     renderMainContent();
   });
 }
 
-function navigateTo(page) {
-  goToPage(page);
-}
+function navigateTo(page) { goToPage(page); }
 
 function initNavigation() {
   document.querySelectorAll('.nav-link[data-page]').forEach(function(link) {
@@ -112,12 +191,12 @@ function initSearch() {
 
 function initDropdowns() {
   var userInfo = document.querySelector('.user-info');
-  var langBtn = document.querySelector('.language-btn');
+  var langBtn = document.getElementById('desktopLangBtn');
   if (userInfo) userInfo.addEventListener('click', function(e) { e.stopPropagation(); toggleDropdown('.user-dropdown'); });
-  if (langBtn) langBtn.addEventListener('click', function(e) { e.stopPropagation(); toggleDropdown('.language-dropdown'); });
+  if (langBtn) langBtn.addEventListener('click', function(e) { e.stopPropagation(); toggleDropdown('#desktopLangDrop'); });
   document.addEventListener('click', function(e) {
     if (!e.target.closest('.user-menu')) closeDropdown('.user-dropdown');
-    if (!e.target.closest('.language-menu')) closeDropdown('.language-dropdown');
+    if (!e.target.closest('.language-menu')) closeDropdown('#desktopLangDrop');
   });
 }
 
@@ -128,7 +207,9 @@ function initKeyboard() {
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
       if (typeof closeModal === 'function') closeModal();
-      closeDropdown('.user-dropdown'); closeDropdown('.language-dropdown'); closeMobileSidebar();
+      closeDropdown('.user-dropdown');
+      closeDropdown('#desktopLangDrop');
+      closeMobileSidebar();
     }
   });
 }
@@ -150,33 +231,49 @@ async function checkExpiredNumbers() {
   window.activeNumbers.forEach(function(n) {
     var timeLeft = n.time_left ?? n.timeLeft ?? 0;
     var totalTime = n.total_time ?? n.totalTime ?? 1;
-    if (n.status === 'waiting' && timeLeft > 0) {
+    if ((n.status === 'waiting' || n.status === 'received') && timeLeft > 0) {
       var newTime = timeLeft - 1; n.time_left = newTime; n.timeLeft = newTime;
-      var timerEl = document.getElementById('timer-' + n.id); if (timerEl) timerEl.textContent = formatTime(newTime);
+
+      var timerEl = document.getElementById('timer-' + n.id);
+      if (timerEl) timerEl.textContent = formatTime(newTime);
       var card = document.getElementById('card-' + n.id);
       if (card) { var bar = card.querySelector('.timer-bar-fill'); if (bar) bar.style.width = (newTime / totalTime * 100) + '%'; }
-      if (newTime <= 0) { n.status = 'expired'; changed = true; fetch('/api/numbers/' + n.id + '/expire', { method: 'POST' }).catch(function() {}); showToast(translations[currentLang]['Number expired, balance refunded'], 'error'); }
+
+      var activeTimer = document.getElementById('timer-active-' + n.id);
+      if (activeTimer) activeTimer.textContent = formatTime(newTime);
+
+      var waitTimer = document.getElementById('timer-wait-' + n.id);
+      if (waitTimer) waitTimer.textContent = formatTime(newTime);
+
+      if (activeTimer) {
+        var activeCard = activeTimer.closest('div[style*="border-radius:14px"]');
+        if (activeCard) {
+          var bars = activeCard.querySelectorAll('div[style*="height:3px"]');
+          if (bars[0]) { var fill = bars[0].firstElementChild; if (fill) fill.style.width = (newTime / totalTime * 100) + '%'; }
+        }
+      }
+      if (waitTimer) {
+        var waitCard = waitTimer.closest('div[style*="border-radius:14px"]');
+        if (waitCard) {
+          var wBars = waitCard.querySelectorAll('div[style*="height:3px"]');
+          if (wBars[0]) { var wFill = wBars[0].firstElementChild; if (wFill) wFill.style.width = (newTime / totalTime * 100) + '%'; }
+        }
+      }
+
+      if (newTime <= 0) { n.status = 'expired'; changed = true; fetch('/api/numbers/' + n.id + '/expire', { method: 'POST' }).catch(function() {}); showToast(translations[currentLang]['Number expired'], 'error'); }
     }
   });
-  if (changed) { await loadBalance(); renderMainContent(); }
+  if (changed) { await loadBalance(); await loadNumbers(); if (window.currentPage === 'numbers') renderMainContent(); }
 }
 
 async function autoRefreshNumbers() {
+  // Only auto-refresh on the numbers page to fetch fresh data from server
   if (window.currentPage !== 'numbers' || !window.activeNumbers) return;
-  
-  var needsRefresh = window.activeNumbers.some(function(n) { return n.status === 'waiting'; });
-  var hasNewCode = window.activeNumbers.some(function(n) { return n.status === 'received' && !n.shown; });
-
-  if (needsRefresh || hasNewCode) {
+  var needsRefresh = window.activeNumbers.some(function(n) { return n.status === 'waiting' || n.status === 'received'; });
+  if (needsRefresh) {
     await loadNumbers();
-    renderMainContent();
-    
-    window.activeNumbers.forEach(function(n) {
-      if (n.status === 'received' && !n.shown) {
-        n.shown = true;
-        showToast('SMS received for ' + n.service_name + '!', 'success');
-      }
-    });
+    // Only re-render if we're still on numbers page
+    if (window.currentPage === 'numbers') renderMainContent();
   }
 }
 
@@ -193,6 +290,7 @@ function showToast(message, type) {
 }
 
 function updateBalanceDisplay(amount) { var el = document.getElementById('balanceAmount'); if (el) el.textContent = '$' + amount.toFixed(2); }
+window.syncBalance = updateBalanceDisplay;
 
 // ====== API CALLS ======
 async function loadBalance() {
@@ -218,16 +316,13 @@ async function loadHistory() {
 function renderMainContent() {
   var main = document.getElementById('mainContent');
   if (!main) return;
-
   var page = window.currentPage;
   var functionName = 'render' + page.charAt(0).toUpperCase() + page.slice(1) + 'Page';
-
   if (typeof window[functionName] === 'function') {
     window[functionName](main);
   } else {
     main.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Page "' + page + '" is missing.</p></div>';
   }
-
   if (page === 'deposit') {
     loadBalance().then(function(b) { var el = document.getElementById('depositCurrentBalance'); if (el) el.textContent = '$' + b.toFixed(2); });
     if (typeof loadDepositHistory === 'function') loadDepositHistory();
@@ -258,23 +353,80 @@ function checkDepositReturn() {
 }
 
 // ====== USER ACTIONS ======
+window.handleLogout = function() {
+  closeMobileSidebar();
+  showToast('Logging out...', 'info');
+  if (typeof logout === 'function') logout();
+};
+
+window.handleDeleteAccount = function() {
+  closeMobileSidebar();
+  deleteAccount();
+};
+
 function deleteAccount() { if (confirm(translations[currentLang]['Are you sure you want to delete your account? This action cannot be undone.'])) showToast(translations[currentLang]['Account deletion not implemented yet'], 'error'); }
 
 // ====== TRANSLATIONS ======
-var translations = { en: { 'Home':'Home','History':'History','Pricing':'Pricing','API':'API','Help':'Help','Settings':'Settings','Contacts':'Contacts','Add Funds':'Add Funds','Logout':'Logout','Delete Account':'Delete Account','English':'English','Chinese':'Chinese','Russian':'Russian','Search services...':'Search services...','Get Virtual Number':'Get Virtual Number','Service':'Service','Select a service...':'Select a service...','Country / Region':'Country / Region','Select country...':'Select country...','Payment Method':'Payment Method','Cancel':'Cancel','Get Number':'Get Number','Number copied to clipboard':'Number copied to clipboard','Copy failed':'Copy failed','Number cancelled, balance refunded':'Number cancelled, balance refunded','Error cancelling number':'Error cancelling number','Requesting new number...':'Requesting new number...','Error refreshing number':'Error refreshing number','All numbers refreshed':'All numbers refreshed','Number expired, balance refunded':'Number expired, balance refunded','Payment submitted! Balance will update after confirmation.':'Payment submitted! Balance will update after confirmation.','Account deletion not implemented yet':'Account deletion not implemented yet','Are you sure you want to delete your account? This action cannot be undone.':'Are you sure you want to delete your account? This action cannot be undone.','Are you sure you want to cancel this number?':'Are you sure you want to cancel this number?','Language changed to':'Language changed to','Error':'Error','Success':'Success','Info':'Info' }, zh: { 'Home':'首页','History':'历史','Pricing':'价格','API':'API','Help':'帮助','Settings':'设置','Contacts':'联系人','Add Funds':'充值','Logout':'登出','Delete Account':'删除账户','English':'英语','Chinese':'中文','Russian':'俄语','Search services...':'搜索服务...','Get Virtual Number':'获取虚拟号码','Service':'服务','Select a service...':'选择服务...','Country / Region':'国家/地区','Select country...':'选择国家...','Payment Method':'支付方式','Cancel':'取消','Get Number':'获取号码','Number copied to clipboard':'号码已复制到剪贴板','Copy failed':'复制失败','Number cancelled, balance refunded':'号码已取消，余额已退款','Error cancelling number':'取消号码时出错','Requesting new number...':'正在请求新号码...','Error refreshing number':'刷新号码时出错','All numbers refreshed':'所有号码已刷新','Number expired, balance refunded':'号码已过期，余额已退款','Payment submitted! Balance will update after confirmation.':'支付已提交！确认后余额将更新。','Account deletion not implemented yet':'账户删除功能尚未实现','Are you sure you want to delete your account? This action cannot be undone.':'确定要删除账户吗？此操作无法撤销。','Are you sure you want to cancel this number?':'确定要取消此号码吗？','Language changed to':'语言已更改为','Error':'错误','Success':'成功','Info':'信息' }, ru: { 'Home':'Главная','History':'История','Pricing':'Цены','API':'API','Help':'Помощь','Settings':'Настройки','Contacts':'Контакты','Add Funds':'Пополнить','Logout':'Выйти','Delete Account':'Удалить аккаунт','English':'Английский','Chinese':'Китайский','Russian':'Русский','Search services...':'Поиск сервисов...','Get Virtual Number':'Получить виртуальный номер','Service':'Сервис','Select a service...':'Выберите сервис...','Country / Region':'Страна / Регион','Select country...':'Выберите страну...','Payment Method':'Способ оплаты','Cancel':'Отмена','Get Number':'Получить номер','Number copied to clipboard':'Номер скопирован','Copy failed':'Ошибка копирования','Number cancelled, balance refunded':'Номер отменен, баланс возвращен','Error cancelling number':'Ошибка отмены','Requesting new number...':'Запрос нового номера...','Error refreshing number':'Ошибка обновления','All numbers refreshed':'Все номера обновлены','Number expired, balance refunded':'Номер истек, баланс возвращен','Payment submitted! Balance will update after confirmation.':'Платеж отправлен! Баланс обновится после подтверждения.','Account deletion not implemented yet':'Удаление аккаунта пока не реализовано','Are you sure you want to delete your account? This action cannot be undone.':'Вы уверены? Это действие нельзя отменить.','Are you sure you want to cancel this number?':'Вы уверены, что хотите отменить этот номер?','Language changed to':'Язык изменен на','Error':'Ошибка','Success':'Успех','Info':'Информация' } };
+var translations = {
+  en: { 'Home':'Home','History':'History','Pricing':'Pricing','API':'API','Help':'Help','Settings':'Settings','Contacts':'Contacts','Add Funds':'Add Funds','Logout':'Logout','Delete Account':'Delete Account','English':'English','Chinese':'Chinese','Russian':'Russian','Search services...':'Search services...','Get Virtual Number':'Get Virtual Number','Service':'Service','Select a service...':'Select a service...','Country / Region':'Country / Region','Select country...':'Select country...','Payment Method':'Payment Method','Cancel':'Cancel','Get Number':'Get Number','Number copied to clipboard':'Number copied to clipboard','Copy failed':'Copy failed','Number cancelled, balance refunded':'Number cancelled, balance refunded','Error cancelling number':'Error cancelling number','Requesting new number...':'Requesting new number...','Error refreshing number':'Error refreshing number','All numbers refreshed':'All numbers refreshed','Number expired, balance refunded':'Number expired, balance refunded','Payment submitted! Balance will update after confirmation.':'Payment submitted! Balance will update after confirmation.','Account deletion not implemented yet':'Account deletion not implemented yet','Are you sure you want to delete your account? This action cannot be undone.':'Are you sure you want to delete your account? This action cannot be undone.','Are you sure you want to cancel this number?':'Are you sure you want to cancel this number?','Language changed to':'Language changed to','Error':'Error','Success':'Success','Info':'Info' },
+  zh: { 'Home':'首页','History':'历史','Pricing':'价格','API':'API','Help':'帮助','Settings':'设置','Contacts':'联系人','Add Funds':'充值','Logout':'登出','Delete Account':'删除账户','English':'英语','Chinese':'中文','Russian':'俄语','Search services...':'搜索服务...','Get Virtual Number':'获取虚拟号码','Service':'服务','Select a service...':'选择服务...','Country / Region':'国家/地区','Select country...':'选择国家...','Payment Method':'支付方式','Cancel':'取消','Get Number':'获取号码','Number copied to clipboard':'号码已复制到剪贴板','Copy failed':'复制失败','Number cancelled, balance refunded':'号码已取消，余额已退款','Error cancelling number':'取消号码时出错','Requesting new number...':'正在请求新号码...','Error refreshing number':'刷新号码时出错','All numbers refreshed':'所有号码已刷新','Number expired, balance refunded':'号码已过期，余额已退款','Payment submitted! Balance will update after confirmation.':'支付已提交！确认后余额将更新。','Account deletion not implemented yet':'账户删除功能尚未实现','Are you sure you want to delete your account? This action cannot be undone.':'确定要删除账户吗？此操作无法撤销。','Are you sure you want to cancel this number?':'确定要取消此号码吗？','Language changed to':'语言已更改为','Error':'错误','Success':'成功','Info':'信息' },
+  ru: { 'Home':'Главная','History':'История','Pricing':'Цены','API':'API','Help':'Помощь','Settings':'Настройки','Contacts':'Контакты','Add Funds':'Пополнить','Logout':'Выйти','Delete Account':'Удалить аккаунт','English':'Английский','Chinese':'Китайский','Russian':'Русский','Search services...':'Поиск сервисов...','Get Virtual Number':'Получить виртуальный номер','Service':'Сервис','Select a service...':'Выберите сервис...','Country / Region':'Страна / Регион','Select country...':'Выберите страну...','Payment Method':'Способ оплаты','Cancel':'Отмена','Get Number':'Получить номер','Number copied to clipboard':'Номер скопирован','Copy failed':'Ошибка копирования','Number cancelled, balance refunded':'Номер отменен, баланс возвращен','Error cancelling number':'Ошибка отмены','Requesting new number...':'Запрос нового номера...','Error refreshing number':'Ошибка обновления','All numbers refreshed':'Все номера обновлены','Number expired, balance refunded':'Номер истек, баланс возвращен','Payment submitted! Balance will update after confirmation.':'Платеж отправлен! Баланс обновится после подтверждения.','Account deletion not implemented yet':'Удаление аккаунта пока не реализовано','Are you sure you want to delete your account? This action cannot be undone.':'Вы уверены? Это действие нельзя отменить.','Are you sure you want to cancel this number?':'Вы уверены, что хотите отменить этот номер?','Language changed to':'Язык изменен на','Error':'Ошибка','Success':'Успех','Info':'Информация' }
+};
 
 var currentLang = localStorage.getItem('language') || 'en';
 
+var langData = {
+  en: { flag: '🇺🇸', label: 'English' },
+  ar: { flag: '🇸🇦', label: 'العربية' },
+  fr: { flag: '🇫🇷', label: 'Français' },
+  es: { flag: '🇪🇸', label: 'Español' },
+  de: { flag: '🇩🇪', label: 'Deutsch' },
+  tr: { flag: '🇹🇷', label: 'Türkçe' },
+  zh: { flag: '🇨🇳', label: '中文' },
+  ru: { flag: '🇷🇺', label: 'Русский' }
+};
+
 function changeLanguage(lang) {
-  currentLang = lang; localStorage.setItem('language', lang);
-  var langBtn = document.querySelector('.language-btn'); if (langBtn) { var flagMap = { en: '🇬🇧', zh: '🇨🇳', ru: '🇷🇺' }; var labelMap = { en: 'EN', zh: '中文', ru: 'RU' }; langBtn.innerHTML = '<span class="language-flag">'+flagMap[lang]+'</span><span class="language-label">'+labelMap[lang]+'</span><i class="fas fa-chevron-down"></i>'; }
-  var langDropdown = document.querySelector('.language-dropdown'); if (langDropdown) { var t = translations[currentLang]; langDropdown.innerHTML = '<button type="button" onclick="changeLanguage(\'en\')"><span>🇬🇧</span> '+t['English']+'</button><button type="button" onclick="changeLanguage(\'zh\')"><span>🇨🇳</span> '+t['Chinese']+'</button><button type="button" onclick="changeLanguage(\'ru\')"><span>🇷🇺</span> '+t['Russian']+'</button>'; }
+  currentLang = lang;
+  localStorage.setItem('language', lang);
+
+  var info = langData[lang] || langData.en;
+
+  var dFlag = document.getElementById('desktopLangFlag');
+  var dLabel = document.getElementById('desktopLangLabel');
+  if (dFlag) dFlag.textContent = info.flag;
+  if (dLabel) dLabel.textContent = info.label;
+
+  var langDropdown = document.getElementById('desktopLangDrop');
+  if (langDropdown) {
+    var html = '';
+    var langs = ['en', 'ar', 'fr', 'es', 'de', 'tr', 'zh', 'ru'];
+    langs.forEach(function(code) {
+      var d = langData[code];
+      if (d) html += '<button type="button" onclick="changeLanguage(\'' + code + '\')"><span>' + d.flag + '</span> ' + d.label + '</button>';
+    });
+    langDropdown.innerHTML = html;
+  }
+
+  var mName = document.getElementById('mobileLangName');
+  if (mName) mName.textContent = info.label;
+
   applyTranslations();
-  showToast(translations[currentLang]['Language changed to'] + ' ' + translations[currentLang][lang === 'en' ? 'English' : lang === 'zh' ? 'Chinese' : 'Russian'], 'info');
+  
+  // THE FIX FOR YOUR PREVIOUS ERROR IS ON THIS NEXT LINE:
+  showToast((translations[currentLang]?.['Language changed to'] || 'Language changed to') + ' ' + info.label, 'info');
 }
+
+// Desktop language setter (called from HTML onclick)
+window.setLang = function(name, flag) {
+  var langMap = { 'English': 'en', 'العربية': 'ar', 'Français': 'fr', 'Español': 'es', 'Deutsch': 'de', 'Türkçe': 'tr', '中文': 'zh', 'Русский': 'ru' };
+  changeLanguage(langMap[name] || 'en');
+  closeDropdown('#desktopLangDrop');
+};
 
 function applyTranslations() {
   var t = translations[currentLang];
+  if (!t) return;
   document.querySelectorAll('.nav-link, button, label, h1, h2, h3, h4, h5, h6, .sidebar-title, .modal-title, .form-label').forEach(function(el) { var text = el.textContent.trim(); if (t[text]) el.textContent = t[text]; });
   document.querySelectorAll('input[placeholder]').forEach(function(input) { var ph = input.getAttribute('placeholder'); if (t[ph]) input.setAttribute('placeholder', t[ph]); });
   document.querySelectorAll('option').forEach(function(opt) { var text = opt.textContent.trim(); if (t[text]) opt.textContent = t[text]; });
@@ -282,12 +434,17 @@ function applyTranslations() {
 
 // ====== BOOT ======
 async function bootSequence() {
-  if (typeof showApp === 'function') { var orig = showApp; showApp = async function() {
-    await orig();
-    await loadBalance();
-    await loadNumbers();
-    window.currentPage = getPageFromHash();
-    renderMainContent();
-  }; }
+  if (typeof showApp === 'function') {
+    var orig = showApp;
+    showApp = async function() {
+      await orig();
+      await loadBalance();
+      await loadNumbers();
+      window.currentPage = getPageFromHash();
+      // Load page data before rendering (fixes history empty on refresh)
+      await preLoadPageData(window.currentPage);
+      renderMainContent();
+    };
+  }
   if (typeof checkSession === 'function') checkSession();
 }

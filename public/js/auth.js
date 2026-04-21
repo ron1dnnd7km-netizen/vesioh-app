@@ -12,18 +12,37 @@ function togglePasswordVisibility(inputId) {
 }
 
 function getServiceListHTML() {
-  const popularServices = services.filter(s => s.category === 'recommended' || s.category === 'social' || s.category === 'ecommerce').slice(0, 16);
+  return '<div id="serviceListContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px;"></div>';
+}
+
+function renderAllServices(searchQuery = '') {
+  const container = document.getElementById('serviceListContainer');
+  if (!container) return;
   
-  return popularServices.map(s => `
-    <div onclick="openServiceModal('${s.id}', '${s.name}')" style="padding:20px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;text-align:center;box-shadow:var(--shadow-sm);transition:all 0.2s;cursor:pointer;"
-         onmouseover="this.style.boxShadow='var(--shadow-md)';this.style.transform='translateY(-2px)';this.style.backgroundColor='rgba(13,155,122,0.05)'"
+  let filteredServices = services;
+  
+  if (searchQuery.trim()) {
+    const query = searchQuery.toLowerCase();
+    filteredServices = services.filter(s => 
+      s.name.toLowerCase().includes(query) || 
+      s.id.toLowerCase().includes(query)
+    );
+  }
+  
+  if (filteredServices.length === 0) {
+    container.innerHTML = '<div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--text-secondary);">No services found. Try a different search.</div>';
+    return;
+  }
+  
+  container.innerHTML = filteredServices.map(s => `
+    <div onclick="openServiceModal('${s.id}', '${s.name}')" style="padding:16px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;text-align:center;box-shadow:var(--shadow-sm);transition:all 0.2s;cursor:pointer;"
+         onmouseover="this.style.boxShadow='var(--shadow-md)';this.style.transform='translateY(-3px)';this.style.backgroundColor='rgba(13,155,122,0.08)'"
          onmouseout="this.style.boxShadow='var(--shadow-sm)';this.style.transform='translateY(0)';this.style.backgroundColor='var(--bg-card)'">
-      <div class="service-icon ${s.iconClass}" style="width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:20px;">
+      <div class="service-icon ${s.iconClass}" style="width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:18px;">
         <i class="${s.icon}"></i>
       </div>
-      <div style="font-size:13px;font-weight:600;margin-bottom:6px;">${s.name}</div>
-      <div style="font-size:14px;font-weight:700;color:var(--accent);">$${s.price.toFixed(2)}</div>
-      <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">per number</div>
+      <div style="font-size:12px;font-weight:600;margin-bottom:6px;line-height:1.3;">${s.name}</div>
+      <div style="font-size:13px;font-weight:700;color:var(--accent);">$${s.price.toFixed(2)}</div>
     </div>
   `).join('');
 }
@@ -268,12 +287,25 @@ function renderLanding() {
     <section style="padding:0 40px 60px;">
       <div style="max-width:900px;margin:0 auto;">
         <h2 style="font-size:28px;font-weight:700;text-align:center;letter-spacing:-1px;margin-bottom:8px;">Available Services</h2>
-        <p style="font-size:14px;color:var(--text-secondary);text-align:center;margin-bottom:32px;">Choose from 200+ services starting at $0.35</p>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+        <p style="font-size:14px;color:var(--text-secondary);text-align:center;margin-bottom:32px;">Search from ${services.length}+ services worldwide</p>
+        
+        <div style="max-width:500px;margin:0 auto 32px;position:relative;">
+          <i class="fas fa-search" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--text-muted);"></i>
+          <input type="text" placeholder="Search services..." oninput="renderAllServices(this.value)" 
+            style="width:100%;padding:12px 16px 12px 40px;border:1px solid var(--border);border-radius:12px;font-size:14px;background:var(--bg-card);color:var(--text-primary);transition:all 0.2s;box-sizing:border-box;"
+            onfocus="this.style.borderColor='var(--accent)';this.style.boxShadow='0 0 0 3px rgba(13,155,122,0.1)'"
+            onblur="this.style.borderColor='var(--border)';this.style.boxShadow='none'">
+        </div>
+        
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px;">
           ${getServiceListHTML()}
         </div>
       </div>
     </section>
+
+    <script>
+      setTimeout(() => renderAllServices(''), 100);
+    </script>
 
     <!-- FOOTER -->
     <footer style="padding:40px;text-align:center;border-top:1px solid var(--border);margin-top:40px;">
@@ -309,13 +341,17 @@ function renderLogin() {
 
         <div style="margin-bottom:24px;">
           <label style="display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Password</label>
-          <div style="position:relative;">
+          <div style="position:relative;margin-bottom:8px;">
             <input type="password" id="loginPassword" placeholder="Enter your password" style="width:100%;padding:11px 40px 11px 14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;color:var(--text-primary);outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'" onkeydown="if(event.key==='Enter')handleLogin()">
             <button type="button" onclick="togglePasswordVisibility('loginPassword')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:14px;">
               <i class="fas fa-eye" id="loginPasswordIcon"></i>
             </button>
           </div>
-          <div style="text-align:right;margin-top:8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <input type="checkbox" id="rememberMe" style="width:16px;height:16px;accent-color:var(--accent);">
+              <label for="rememberMe" style="font-size:12px;color:var(--text-secondary);cursor:pointer;">Remember me</label>
+            </div>
             <a href="#" onclick="event.preventDefault();showForgotPassword()" style="font-size:12px;color:var(--accent);text-decoration:none;">Forgot password?</a>
           </div>
         </div>
@@ -323,11 +359,6 @@ function renderLogin() {
         <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;" onclick="handleLogin()" id="loginBtn">
           Log In
         </button>
-
-        <div style="margin-top:16px;display:flex;align-items:center;gap:8px;">
-          <input type="checkbox" id="rememberMe" style="width:16px;height:16px;accent-color:var(--accent);">
-          <label for="rememberMe" style="font-size:12px;color:var(--text-secondary);cursor:pointer;">Remember me</label>
-        </div>
       </div>
     </div>
   `;

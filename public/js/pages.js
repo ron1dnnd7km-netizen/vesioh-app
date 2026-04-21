@@ -1,55 +1,178 @@
 function renderNumbersPage(main) {
-  var totalActive = activeNumbers ? activeNumbers.length : 0;
-  var waitingCount = activeNumbers ? activeNumbers.filter(function(n){ return n.status === 'waiting'; }).length : 0;
-  var purchasedSection = totalActive > 0
-    ? '<div style="display:grid;gap:18px;margin-top:18px;">' + activeNumbers.map(renderNumberCard).join('') + '</div>'
-    : '<div style="padding:22px;border:1px dashed var(--border);border-radius:14px;color:var(--text-secondary);font-size:14px;">You have no active numbers yet. Choose a service below to buy your first temporary number.</div>';
+  var activeOnlyNumbers = activeNumbers ? activeNumbers.filter(function(n) { return n.status === 'waiting' || n.status === 'received'; }) : [];
+  var totalActive = activeOnlyNumbers.length;
+  var waitingNumbers = activeOnlyNumbers;
+  var waitingCount = waitingNumbers.length;
 
-  main.innerHTML = '<div class="page-header">' +
-    '<h1 class="page-title">Welcome back to SMS Virtual Code</h1>' +
+  var activeNumbersHTML = totalActive > 0
+    ? waitingNumbers.map(renderActiveNumberCard).join('')
+    : '<div style="padding:22px;border:1px dashed var(--border);border-radius:14px;color:var(--text-secondary);font-size:14px;">No active numbers yet. Buy one from below.</div>';
+
+  // ====== ADDED THE SERVICE GRID HERE! ======
+  var serviceGridHTML = '<div style="margin-top:24px;">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">' +
+      '<h2 style="font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px;">' +
+        '<i class="fas fa-shopping-cart" style="color:var(--accent);font-size:14px;"></i> Get Virtual Number</h2>' +
     '</div>' +
-    '<div class="page-content" style="max-width:980px;margin:0 auto;">' +
-    '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-bottom:28px;">' +
-      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:22px;box-shadow:var(--shadow-sm);">' +
-        '<h3 style="font-size:16px;font-weight:700;margin-bottom:10px;">Current active numbers</h3>' +
-        '<p style="font-size:28px;font-weight:800;margin:0;">' + totalActive + '</p>' +
-      '</div>' +
-      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:22px;box-shadow:var(--shadow-sm);">' +
-        '<h3 style="font-size:16px;font-weight:700;margin-bottom:10px;">Waiting for SMS</h3>' +
-        '<p style="font-size:28px;font-weight:800;margin:0;">' + waitingCount + '</p>' +
-      '</div>' +
-      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:22px;box-shadow:var(--shadow-sm);">' +
-        '<h3 style="font-size:16px;font-weight:700;margin-bottom:10px;">Quick purchase</h3>' +
-        '<p style="font-size:14px;color:var(--text-secondary);line-height:1.75;margin:0;">Select a service below to reserve a new number instantly.</p>' +
-      '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;">' +
+      getDashboardServiceListHTML() +
     '</div>' +
-    '<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:22px;margin-bottom:32px;">' +
-      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:26px;box-shadow:var(--shadow-sm);">' +
-        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px;">' +
-          '<div>' +
-            '<h2 style="font-size:24px;font-weight:700;margin-bottom:10px;">Buy a temporary number</h2>' +
-            '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin:0;">Choose a verification service below and instantly reserve a temporary SMS number.</p>' +
-          '</div>' +
-          '<button class="btn btn-primary" onclick="document.getElementById(\'serviceSearch\').focus()">Search services</button>' +
+  '</div>';
+
+  // ====== THE FIX: ADDED main.innerHTML = AND + SIGNS ======
+  main.innerHTML =
+
+    /* ===== NUMBER & CODE COMBINED ===== */
+    '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);margin-bottom:28px;">' +
+      '<div>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">' +
+          '<h2 style="font-size:18px;font-weight:700;display:flex;align-items:center;gap:10px;">' +
+            '<i class="fas fa-phone-alt" style="color:var(--accent);font-size:15px;"></i> Active Numbers</h2>' +
+          '<span style="font-size:12px;padding:3px 10px;border-radius:8px;font-weight:600;background:var(--accent-dim);color:var(--accent);">' + totalActive + ' active</span>' +
         '</div>' +
-        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;">' + getDashboardServiceListHTML() + '</div>' +
-      '</div>' +
-      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:26px;box-shadow:var(--shadow-sm);">' +
-        '<h2 style="font-size:24px;font-weight:700;margin-bottom:14px;">Purchased numbers</h2>' +
-        '<p style="font-size:14px;color:var(--text-secondary);line-height:1.8;margin:0 0 18px;">Your active numbers and verification codes appear here automatically.</p>' +
-        purchasedSection +
+        '<div style="display:flex;flex-direction:column;gap:12px;">' + activeNumbersHTML + '</div>' +
       '</div>' +
     '</div>' +
-    '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:28px;box-shadow:var(--shadow-sm);">' +
-      '<h2 style="font-size:28px;font-weight:700;margin-bottom:18px;">Why use temporary phone numbers</h2>' +
-      '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin-bottom:20px;">When creating accounts, most websites require a valid mobile number, and typically only one account is allowed per number. Temporary numbers let you create and manage multiple accounts without limitations.</p>' +
-      '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin-bottom:20px;"><strong>Protect your privacy</strong><br>Your personal phone number can reveal sensitive details. Using temporary numbers helps keep your identity and information secure.</p>' +
-      '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin-bottom:20px;"><strong>Avoid scams and unwanted charges</strong><br>Some websites request phone numbers for downloads or access, which may lead to hidden subscriptions or spam. Temporary numbers help you avoid these risks.</p>' +
-      '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;"><strong>Bypass regional restrictions</strong><br>Certain services limit access based on location. Temporary numbers from different countries allow you to register and use platforms without geographic barriers.</p>' +
+
+    /* ===== IMPORTANT INFO SECTION ===== */
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-bottom:28px;">' +
+      '<div style="background:rgba(13,155,122,0.08);border:1px solid rgba(13,155,122,0.2);border-radius:12px;padding:16px;box-shadow:var(--shadow-sm);">' +
+        '<h3 style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--accent);">No Cancellations Within 45s</h3>' +
+        '<p style="font-size:12px;color:var(--text-secondary);line-height:1.5;">Orders cannot be canceled within 45 seconds after a number is purchased.</p>' +
+      '</div>' +
+      '<div style="background:rgba(13,155,122,0.08);border:1px solid rgba(13,155,122,0.2);border-radius:12px;padding:16px;box-shadow:var(--shadow-sm);">' +
+        '<h3 style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--accent);">SMS Not Received?</h3>' +
+        '<p style="font-size:12px;color:var(--text-secondary);line-height:1.5;">Try removing the country code from the number and attempt again.</p>' +
+      '</div>' +
+      '<div style="background:rgba(13,155,122,0.08);border:1px solid rgba(13,155,122,0.2);border-radius:12px;padding:16px;box-shadow:var(--shadow-sm);">' +
+        '<h3 style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--accent);">Automatic Refunds</h3>' +
+        '<p style="font-size:12px;color:var(--text-secondary);line-height:1.5;">Funds will be automatically refunded to your wallet if the request times out or is canceled.</p>' +
+      '</div>' +
     '</div>' +
-    '</div>';
+
+    /* ===== INFO SECTION ===== */
+    '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:28px;box-shadow:var(--shadow-sm);margin-bottom:28px;">' +
+      '<h2 style="font-size:22px;font-weight:700;margin-bottom:16px;">Why use temporary phone numbers</h2>' +
+      '<p style="font-size:14px;color:var(--text-secondary);line-height:1.8;margin-bottom:14px;">When creating accounts, most websites require a valid mobile number. Temporary numbers let you create and manage multiple accounts without limitations.</p>' +
+      '<p style="font-size:14px;color:var(--text-secondary);line-height:1.8;margin-bottom:14px;"><strong>Protect your privacy</strong> — Your personal phone number can reveal sensitive details. Using temporary numbers helps keep your identity secure.</p>' +
+      '<p style="font-size:14px;color:var(--text-secondary);line-height:1.8;"><strong>Bypass regional restrictions</strong> — Temporary numbers from different countries allow you to register on platforms without geographic barriers.</p>' +
+    '</div>' +
+
+    /* ===== THIS ADDS THE BUTTONS TO THE PAGE ===== */
+    serviceGridHTML;
 }
 
+/* ===== Card for combined Number + Code display ===== */
+function renderActiveNumberCard(n) {
+  var timeLeft = (n.time_left !== undefined && n.time_left !== null) ? n.time_left : (n.timeLeft || 0);
+  var serviceName = n.service_name || (n.service ? n.service.name : 'Unknown');
+  var countryFlag = n.country_flag || '🏳️';
+  var minutes = Math.floor(timeLeft / 60);
+  var seconds = timeLeft % 60;
+  var timerDisplay = String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+  
+  var statusColors = { waiting: 'var(--warning)', received: 'var(--accent)', expired: 'var(--danger)' };
+  var statusLabels = { waiting: 'Waiting', received: 'Received', expired: 'Timeout' };
+  var statusColor = statusColors[n.status] || 'var(--text-muted)';
+  var statusLabel = statusLabels[n.status] || n.status;
+
+  var codeDisplay = '';
+  if (n.status === 'received' && n.code) {
+    codeDisplay = '<div style="font-family:JetBrains Mono,monospace;font-size:16px;font-weight:800;color:var(--accent);letter-spacing:3px;margin:0 8px;">' + n.code + '</div>';
+  }
+
+  var cancelBtn = (n.status === 'waiting' || n.status === 'received')
+    ? '<button class="btn-sm cancel" onclick="cancelNumber(' + n.id + ')" style="padding:4px 8px;font-size:11px;background:var(--danger);color:white;border:none;border-radius:6px;cursor:pointer;"><i class="fas fa-times"></i></button>'
+    : '';
+
+  return '<div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;">' +
+    '<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:150px;">' +
+      '<div style="font-size:16px;flex-shrink:0;">' + countryFlag + '</div>' +
+      '<div class="service-icon ' + (n.service_id || 'other') + '" style="width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;">' +
+        '<i class="' + (n.service_icon || 'fas fa-mobile-alt') + '"></i>' +
+      '</div>' +
+      '<div style="font-family:JetBrains Mono,monospace;font-size:13px;font-weight:700;word-break:break-all;">' + n.phone + '</div>' +
+      '<button class="btn-sm copy" onclick="copyNumber(\'' + n.phone + '\')" style="padding:4px 6px;font-size:10px;flex-shrink:0;"><i class="fas fa-copy"></i></button>' +
+    '</div>' +
+    codeDisplay +
+    '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">' +
+      '<span style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:600;color:' + statusColor + ';min-width:35px;text-align:right;" id="timer-active-' + n.id + '">' + timerDisplay + '</span>' +
+      '<span style="font-size:11px;font-weight:700;color:var(--accent);min-width:30px;text-align:right;">$' + n.cost.toFixed(2) + '</span>' +
+      cancelBtn +
+    '</div>' +
+  '</div>';
+}
+
+/* ===== Card for "Code" panel — shows code, timeline, cancel ===== */
+function renderWaitingCard(n) {
+  var timeLeft = (n.time_left !== undefined && n.time_left !== null) ? n.time_left : (n.timeLeft || 0);
+  var totalTime = (n.total_time !== undefined && n.total_time !== null) ? n.total_time : (n.totalTime || 1);
+  var barWidth = n.status === 'expired' ? 0 : (timeLeft / totalTime * 100);
+  var serviceName = n.service_name || (n.service ? n.service.name : 'Unknown');
+
+  var timerDisplay = n.status === 'expired'
+    ? '<span style="color:var(--danger);font-size:13px;"><i class="fas fa-times-circle"></i> Expired</span>'
+    : '<span style="font-family:JetBrains Mono,monospace;font-size:14px;font-weight:600;" id="timer-wait-' + n.id + '">' + formatTime(timeLeft) + '</span>';
+
+  var codeBlock = '';
+  if (n.status === 'received' && n.code) {
+    codeBlock = '<div style="margin-bottom:14px;">' +
+      '<div style="font-size:11px;color:var(--accent);font-weight:600;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">Verification Code</div>' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;background:var(--accent-dim);border:1px solid rgba(0,212,170,0.25);border-radius:10px;padding:12px 14px;">' +
+        '<span style="font-family:JetBrains Mono,monospace;font-size:24px;font-weight:800;color:var(--accent);letter-spacing:5px;">' + n.code + '</span>' +
+        '<button class="btn-sm copy" onclick="copyNumber(\'' + n.code + '\')" style="padding:6px 12px;"><i class="fas fa-copy"></i> Copy</button>' +
+      '</div>' +
+      (n.sms_text ? '<div style="font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.5;"><i class="fas fa-envelope" style="margin-right:4px;"></i>' + n.sms_text + '</div>' : '') +
+    '</div>';
+  } else {
+    codeBlock = '<div style="margin-bottom:14px;">' +
+      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">' +
+        '<span style="width:7px;height:7px;border-radius:50%;background:var(--warning);animation:blink 1.2s ease-in-out infinite;display:inline-block;"></span>' +
+        '<span style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.8px;">Waiting for code...</span>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--text-muted);font-style:italic;">No code received yet. Send SMS to the number.</div>' +
+    '</div>';
+  }
+
+  var tlDot2Style = n.status === 'received'
+    ? 'background:var(--accent);'
+    : 'background:var(--warning);animation:blink 1.2s ease-in-out infinite;';
+  var tlText2 = n.status === 'received'
+    ? 'SMS received: ' + n.code
+    : 'Waiting for SMS...';
+
+  var timelineHTML = '<div style="margin-bottom:14px;">' +
+    '<div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">Timeline</div>' +
+    '<div style="display:flex;flex-direction:column;gap:8px;padding-left:4px;">' +
+      '<div style="display:flex;align-items:flex-start;gap:8px;">' +
+        '<span style="width:7px;height:7px;border-radius:50%;background:var(--accent);margin-top:4px;flex-shrink:0;"></span>' +
+        '<span style="font-size:12px;color:var(--text-secondary);">Number assigned</span>' +
+      '</div>' +
+      '<div style="display:flex;align-items:flex-start;gap:8px;">' +
+        '<span style="width:7px;height:7px;border-radius:50%;' + tlDot2Style + 'margin-top:4px;flex-shrink:0;"></span>' +
+        '<span style="font-size:12px;color:var(--text-secondary);">' + tlText2 + '</span>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+
+  var cancelHTML = '';
+  if (n.status === 'waiting') {
+    cancelHTML = '<button class="btn-sm cancel" onclick="cancelNumber(' + n.id + ')" style="width:100%;justify-content:center;padding:10px;font-size:13px;border-radius:10px;margin-top:4px;"><i class="fas fa-times"></i> Cancel</button>';
+  }
+
+  return '<div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:14px;padding:16px;">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">' +
+      '<div style="font-size:14px;font-weight:600;">' + serviceName + '</div>' +
+      timerDisplay +
+    '</div>' +
+    '<div style="height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:14px;"><div style="height:100%;width:' + barWidth + '%;background:' + (n.status === 'received' ? 'var(--accent)' : 'var(--warning)') + ';border-radius:2px;transition:width 1s linear;"></div></div>' +
+    codeBlock +
+    timelineHTML +
+    cancelHTML +
+  '</div>';
+}
+
+/* ===== Keep original renderNumberCard for history/other uses ===== */
 function renderNumberCard(n) {
   var statusTexts = { waiting: 'Waiting for SMS...', received: 'Code received', expired: 'Number expired' };
   var smsBlock = '';
@@ -100,18 +223,18 @@ function renderNumberCard(n) {
 
 function getDashboardServiceListHTML() {
   var items = [
-    { name: 'WhatsApp', icon: 'fab fa-whatsapp', color: '#25d366', bg: 'rgba(37,211,102,0.1)', price: '0.70', id: 'wa-us', region: 'US' },
-    { name: 'Telegram', icon: 'fab fa-telegram-plane', color: '#24a1de', bg: 'rgba(36,161,222,0.1)', price: '0.45', id: 'tg', region: 'US' },
-    { name: 'Facebook', icon: 'fab fa-facebook-f', color: '#1877f2', bg: 'rgba(24,119,242,0.1)', price: '0.50', id: 'fb-us', region: 'US' },
-    { name: 'Instagram', icon: 'fab fa-instagram', color: '#e1306c', bg: 'rgba(225,48,108,0.1)', price: '0.60', id: 'ig', region: 'US' },
-    { name: 'Google', icon: 'fab fa-google', color: '#4285f4', bg: 'rgba(66,133,244,0.1)', price: '0.35', id: 'google', region: 'US' },
-    { name: 'Twitter / X', icon: 'fab fa-x-twitter', color: '#1da1f2', bg: 'rgba(29,161,242,0.1)', price: '0.55', id: 'twitter', region: 'US' },
-    { name: 'TikTok', icon: 'fab fa-tiktok', color: '#cc0044', bg: 'rgba(255,0,80,0.06)', price: '0.55', id: 'tiktok', region: 'US' },
-    { name: 'Discord', icon: 'fab fa-discord', color: '#5865f2', bg: 'rgba(88,101,242,0.1)', price: '0.40', id: 'discord', region: 'US' },
-    { name: 'Amazon', icon: 'fab fa-amazon', color: '#e68a00', bg: 'rgba(255,153,0,0.1)', price: '0.90', id: 'amazon', region: 'US' },
-    { name: 'Microsoft', icon: 'fab fa-microsoft', color: '#0078d4', bg: 'rgba(0,120,212,0.1)', price: '0.50', id: 'ms', region: 'US' },
-    { name: 'Fiverr', icon: 'fab fa-font-awesome', color: '#00af50', bg: 'rgba(0,175,80,0.1)', price: '0.80', id: 'fiverr', region: 'US' },
-    { name: 'PayPal', icon: 'fab fa-paypal', color: '#003087', bg: 'rgba(0,48,135,0.1)', price: '0.85', id: 'paypal', region: 'US' }
+    { name: 'WhatsApp', icon: 'fab fa-whatsapp', color: '#25d366', bg: 'rgba(37,211,102,0.1)', price: '0.70', id: 'wa', region: 'Any' },
+    { name: 'Telegram', icon: 'fab fa-telegram-plane', color: '#24a1de', bg: 'rgba(36,161,222,0.1)', price: '0.45', id: 'tg', region: 'Any' },
+    { name: 'Facebook', icon: 'fab fa-facebook-f', color: '#1877f2', bg: 'rgba(24,119,242,0.1)', price: '0.50', id: 'fb', region: 'Any' },
+    { name: 'Instagram', icon: 'fab fa-instagram', color: '#e1306c', bg: 'rgba(225,48,108,0.1)', price: '0.60', id: 'ig', region: 'Any' },
+    { name: 'Google', icon: 'fab fa-google', color: '#4285f4', bg: 'rgba(66,133,244,0.1)', price: '0.35', id: 'google', region: 'Any' },
+    { name: 'Twitter / X', icon: 'fab fa-x-twitter', color: '#1da1f2', bg: 'rgba(29,161,242,0.1)', price: '0.55', id: 'tw', region: 'Any' },
+    { name: 'TikTok', icon: 'fab fa-tiktok', color: '#cc0044', bg: 'rgba(255,0,80,0.06)', price: '0.20', id: 'tk', region: 'Any' },
+    { name: 'Discord', icon: 'fab fa-discord', color: '#5865f2', bg: 'rgba(88,101,242,0.1)', price: '0.40', id: 'discord', region: 'Any' },
+    { name: 'Amazon', icon: 'fab fa-amazon', color: '#e68a00', bg: 'rgba(255,153,0,0.1)', price: '0.90', id: 'amz', region: 'Any' },
+    { name: 'Microsoft', icon: 'fab fa-microsoft', color: '#0078d4', bg: 'rgba(0,120,212,0.1)', price: '0.50', id: 'microsoft', region: 'Any' },
+    { name: 'Fiverr', icon: 'fab fa-font-awesome', color: '#00af50', bg: 'rgba(0,175,80,0.1)', price: '0.80', id: 'fiverr', region: 'Any' },
+    { name: 'PayPal', icon: 'fab fa-paypal', color: '#003087', bg: 'rgba(0,48,135,0.1)', price: '0.85', id: 'pp', region: 'Any' }
   ];
   return items.map(function(s) {
     var service = services.find(function(x) { return x.id === s.id; }) || {};
@@ -135,17 +258,46 @@ function renderHistoryPage(main) {
     rows = '<div class="empty-state"><i class="fas fa-history"></i><h3>No history yet</h3><p>Your SMS code history will appear here</p></div>';
   } else {
     rows = historyData.map(function(h) {
-      var codeHTML = h.code ? '<div class="history-code">' + h.code + '</div>' : '';
-      var serviceName = h.service_name || 'Unknown Service';
-      return '<div class="history-item"><div class="history-icon other"><i class="fas fa-sms"></i></div>' +
-        '<div class="history-info"><div class="history-service">' + serviceName + '</div>' +
-        '<div class="history-detail"><span style="font-family:JetBrains Mono,monospace;">' + h.phone + '</span><span>$' + h.cost.toFixed(2) + '</span></div></div>' +
-        codeHTML + '<span class="history-status ' + h.status + '">' + (h.status === 'success' ? 'Success' : 'Failed') + '</span></div>';
+      // Look up service from services array
+      var service = services.find(function(s) { return s.name.toLowerCase() === h.service_name.toLowerCase(); });
+      var countryFlag = '🏳️';
+      var serviceIcon = service ? service.icon : 'fas fa-mobile-alt';
+      var serviceId = service ? service.id : 'other';
+      
+      var statusColor, statusLabel;
+      if (h.status === 'success') {
+        statusColor = 'var(--accent)';
+        statusLabel = 'Code Received';
+      } else if (h.status === 'pending' || h.status === 'waiting') {
+        statusColor = 'var(--warning)';
+        statusLabel = 'Waiting';
+      } else {
+        statusColor = 'var(--danger)';
+        statusLabel = 'Timeout';
+      }
+      
+      var codeDisplay = h.code ? '<div style="font-family:JetBrains Mono,monospace;font-size:14px;font-weight:800;color:var(--accent);letter-spacing:2px;margin:0 6px;">' + h.code + '</div>' : '';
+      
+      return '<div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;">' +
+        '<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:150px;">' +
+          '<div style="font-size:16px;flex-shrink:0;">' + countryFlag + '</div>' +
+          '<div class="service-icon ' + serviceId + '" style="width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;">' +
+            '<i class="' + serviceIcon + '"></i>' +
+          '</div>' +
+          '<div style="font-family:JetBrains Mono,monospace;font-size:13px;font-weight:700;word-break:break-all;">' + h.phone + '</div>' +
+          '<button class="btn-sm copy" onclick="copyNumber(\'' + h.phone + '\')" style="padding:4px 6px;font-size:10px;flex-shrink:0;"><i class="fas fa-copy"></i></button>' +
+        '</div>' +
+        codeDisplay +
+        '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">' +
+          '<span style="font-size:10px;padding:3px 8px;border-radius:6px;font-weight:600;background:' + statusColor + '22;color:' + statusColor + ';white-space:nowrap;">' + statusLabel + '</span>' +
+          '<span style="font-size:11px;font-weight:700;color:var(--accent);min-width:30px;text-align:right;">$' + h.cost.toFixed(2) + '</span>' +
+        '</div>' +
+      '</div>';
     }).join('');
   }
   main.innerHTML = '<div class="page-header"><h1 class="page-title">SMS History</h1>' +
     '<div class="page-actions"><button class="btn btn-secondary" onclick="showToast(\'Export coming soon\',\'info\')"><i class="fas fa-download"></i> Export</button></div></div>' +
-    '<div class="history-section"><div class="history-list">' + rows + '</div></div>';
+    '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);"><div style="display:flex;flex-direction:column;gap:12px;">' + rows + '</div></div>';
 }
 
 async function renderSettingsPage(main) {
@@ -264,17 +416,20 @@ var depositMethodInfo = {
   usdt: {
     title: 'USDT-TRC20',
     subtitle: 'Confirmation: 5-10 minutes',
-    note: 'Send USDT via TRC20 network. Do not use ERC20 or BEP20.'
+    note: 'Send USDT via TRC20 network. Do not use ERC20 or BEP20.',
+    fee: 'Network fee: ~1 USDT'
   },
   stripe: {
     title: 'Bank Cards',
     subtitle: 'Confirmation: 1-5 minutes',
-    note: 'Supports Visa, Mastercard and local bank cards.'
+    note: 'Supports Visa, Mastercard and local bank cards.',
+    fee: 'Processing fee: 2.5%'
   },
   crypto: {
     title: 'Cryptocurrency',
     subtitle: 'Confirmation: 5-30 minutes depending on network',
-    note: 'Pay with BTC, ETH, LTC, DOGE, USDT and more through our secure gateway.'
+    note: 'Pay with BTC, ETH, LTC, DOGE, USDT and more through our secure gateway.',
+    fee: 'Network fee varies by coin'
   }
 };
 
@@ -299,8 +454,7 @@ function selectCryptoCurrency(currencyId, el) {
   el.style.background = 'var(--accent-dim)';
   el.style.borderColor = 'var(--accent)';
   el.style.color = 'var(--accent)';
-  
-  // Dynamically update the minimum note based on selected coin
+
   var minNote = document.getElementById('cryptoMinNote');
   if (minNote) {
     if (currencyId === 'USDT_TRX') {
@@ -309,7 +463,7 @@ function selectCryptoCurrency(currencyId, el) {
       minNote.textContent = 'Note that the minimum amount is: US$2';
     }
   }
-  
+
   updatePayButton();
 }
 
@@ -348,7 +502,6 @@ function renderDepositPage(main) {
     '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;"><div style="width:44px;height:44px;border-radius:14px;background:rgba(247,147,26,0.1);display:flex;align-items:center;justify-content:center;color:#f7931a;"><i class="fas fa-coins" style="font-size:18px;"></i></div><div><div style="font-size:16px;font-weight:700;">Cryptocurrency</div><div style="font-size:13px;color:var(--text-muted);">Secure crypto payment</div></div></div>' +
     '<div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">Pay with USDT and crypto options through our secure gateway.</div>' +
     '<div style="margin-top:18px;"><button class="btn btn-outline dep-meth" data-method="crypto" onclick="selectPaymentMethod(\'crypto\', this)" style="width:100%;padding:12px;font-size:14px;">Select</button></div>' +
-    '</div>' +
     '</div>' +
     '<div class="stat-card" style="padding:24px;">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:24px;">' +
@@ -447,13 +600,11 @@ function updatePayButton() {
 }
 
 async function processDeposit() {
-  // Check specific USDT TRC-20 minimum (Plisio requires $5)
   if (selectedCryptoCurrency === 'USDT_TRX' && selectedDepositAmount < 5) {
     showToast('Minimum for USDT TRC-20 is $5.00', 'error');
     return;
   }
-  
-  // General minimum for other coins
+
   if (selectedDepositAmount < 2) {
     showToast('Minimum deposit is $2.00', 'error');
     return;
@@ -516,3 +667,119 @@ async function loadDepositHistory() {
     }).join('');
   } catch (err) { /* silent */ }
 }
+
+
+// =======================================================================
+// ===== BUY LOGIC =====
+// =======================================================================
+
+window.selectedBuyService = null;
+
+window.openModalById = function(serviceId) {
+  var service = services.find(function(s) { return s.id === serviceId; });
+  
+  if (!service) {
+    console.error("Service not found for ID:", serviceId);
+    showToast('Error: Service not found', 'error');
+    return;
+  }
+
+  window.selectedBuyService = service;
+  console.log("Preparing to buy:", service.id, service.name);
+
+  var countryOptions = countries.map(function(c) {
+    return '<option value="' + c.code + '">' + c.flag + ' ' + c.name + ' (+ $' + c.basePrice.toFixed(2) + ')</option>';
+  }).join('');
+
+  var modalHTML = '<div class="modal-overlay show" id="buyModalOverlay" onclick="if(event.target===this)closeBuyModal()">' +
+    '<div class="modal" style="width:440px;">' +
+      '<div class="modal-header">' +
+        '<h2 class="modal-title">Get Virtual Number</h2>' +
+        '<button class="modal-close" onclick="closeBuyModal()"><i class="fas fa-times"></i></button>' +
+      '</div>' +
+      '<div class="modal-body">' +
+        '<div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;padding:14px;background:var(--bg-primary);border-radius:12px;border:1px solid var(--border);">' +
+          '<div class="service-icon ' + (service.iconClass || 'other') + '" style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;"><i class="' + service.icon + '"></i></div>' +
+          '<div><div style="font-size:16px;font-weight:700;">' + service.name + '</div><div style="font-size:12px;color:var(--text-muted);">Base price: $' + service.price.toFixed(2) + '</div></div>' +
+        '</div>' +
+        '<div class="form-group">' +
+          '<label class="form-label">Country / Region</label>' +
+          '<select class="form-select" id="countrySelect">' + countryOptions + '</select>' +
+        '</div>' +
+      '</div>' +
+      '<div class="modal-footer">' +
+        '<button class="btn btn-secondary" onclick="closeBuyModal()">Cancel</button>' +
+        '<button class="btn btn-primary" id="finalBuyBtn" onclick="executeBuyNumber()"><i class="fas fa-phone-alt"></i> Get Number</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+
+  var existing = document.getElementById('buyModalOverlay');
+  if (existing) existing.remove();
+
+  document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.closeBuyModal = function() {
+  var modal = document.getElementById('buyModalOverlay');
+  if (modal) modal.remove();
+  window.selectedBuyService = null;
+};
+
+window.executeBuyNumber = function() {
+  if (!window.selectedBuyService || !window.selectedBuyService.id) {
+    showToast('Please select a service.', 'error');
+    return;
+  }
+
+  // ===== FIX: CORRECTLY DEFINE VARIABLES =====
+  var serviceCode = window.selectedBuyService.id;
+  var serviceName = window.selectedBuyService.name;
+  var servicePrice = window.selectedBuyService.price;
+  var userEmail = (typeof getUserEmail === 'function') ? getUserEmail() : '';
+  
+  var countryDropdown = document.getElementById('countrySelect');
+  var countryCode = countryDropdown ? countryDropdown.value : 'us';
+
+  console.log("EXECUTING BUY -> Service ID:", serviceCode, "| Country:", countryCode);
+
+  var btn = document.getElementById('finalBuyBtn');
+  if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Buying...'; btn.disabled = true; }
+
+  fetch('/api/numbers/request', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: userEmail,
+      serviceName: serviceName,
+      serviceId: serviceCode,
+      countryCode: countryCode,
+      cost: servicePrice
+    })
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    if (data.error) {
+      showToast(data.error, 'error');
+    } else {
+      showToast('Number purchased successfully!', 'success');
+      closeBuyModal();
+      if (typeof loadBalance === 'function') loadBalance();
+      if (typeof loadNumbers === 'function') {
+         loadNumbers().then(function() {
+            if (typeof renderMainContent === 'function') renderMainContent();
+         });
+      }
+    }
+  })
+  .catch(function(err) {
+    console.error("Buy error:", err);
+    showToast('Failed to connect to server.', 'error');
+  })
+  .finally(function() {
+    if (btn) {
+      btn.innerHTML = '<i class="fas fa-phone-alt"></i> Get Number';
+      btn.disabled = false;
+    }
+  });
+};

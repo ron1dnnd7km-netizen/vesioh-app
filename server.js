@@ -13,40 +13,79 @@ try {
   process.exit(1);
 }
 
+// FIXED: Changed all country codes to lowercase ISO standards to match frontend
 const countries = [
-  { code: 'US', name: 'United States', flag: '🇺🇸', prefix: '+1', basePrice: 0.50 },
-  { code: 'UK', name: 'United Kingdom', flag: '🇬🇧', prefix: '+44', basePrice: 0.65 },
-  { code: 'DE', name: 'Germany', flag: '🇩🇪', prefix: '+49', basePrice: 0.60 },
-  { code: 'FR', name: 'France', flag: '🇫🇷', prefix: '+33', basePrice: 0.55 },
-  { code: 'CA', name: 'Canada', flag: '🇨🇦', prefix: '+1', basePrice: 0.60 },
-  { code: 'AU', name: 'Australia', flag: '🇦🇺', prefix: '+61', basePrice: 0.70 },
-  { code: 'JP', name: 'Japan', flag: '🇯🇵', prefix: '+81', basePrice: 0.80 },
-  { code: 'NL', name: 'Netherlands', flag: '🇳🇱', prefix: '+31', basePrice: 0.55 },
-  { code: 'IN', name: 'India', flag: '🇮🇳', prefix: '+91', basePrice: 0.20 },
-  { code: 'BR', name: 'Brazil', flag: '🇧🇷', prefix: '+55', basePrice: 0.40 },
-  { code: 'MX', name: 'Mexico', flag: '🇲🇽', prefix: '+52', basePrice: 0.30 },
-  { code: 'ID', name: 'Indonesia', flag: '🇮🇩', prefix: '+62', basePrice: 0.25 },
-  { code: 'PH', name: 'Philippines', flag: '🇵🇭', prefix: '+63', basePrice: 0.25 },
-  { code: 'VN', name: 'Vietnam', flag: '🇻🇳', prefix: '+84', basePrice: 0.20 },
-  { code: 'TH', name: 'Thailand', flag: '🇹🇭', prefix: '+66', basePrice: 0.25 },
-  { code: 'MY', name: 'Malaysia', flag: '🇲🇾', prefix: '+60', basePrice: 0.30 },
-  { code: 'ES', name: 'Spain', flag: '🇪🇸', prefix: '+34', basePrice: 0.50 },
-  { code: 'IT', name: 'Italy', flag: '🇮🇹', prefix: '+39', basePrice: 0.55 },
-  { code: 'PL', name: 'Poland', flag: '🇵🇱', prefix: '+48', basePrice: 0.45 },
-  { code: 'TR', name: 'Turkey', flag: '🇹🇷', prefix: '+90', basePrice: 0.40 },
-  { code: 'AE', name: 'UAE', flag: '🇦🇪', prefix: '+971', basePrice: 0.60 },
-  { code: 'SA', name: 'Saudi Arabia', flag: '🇸🇦', prefix: '+966', basePrice: 0.50 },
-  { code: 'EG', name: 'Egypt', flag: '🇪🇬', prefix: '+20', basePrice: 0.30 },
-  { code: 'NG', name: 'Nigeria', flag: '🇳🇬', prefix: '+234', basePrice: 0.35 },
-  { code: 'ZA', name: 'South Africa', flag: '🇿🇦', prefix: '+27', basePrice: 0.40 },
-  { code: 'AR', name: 'Argentina', flag: '🇦🇷', prefix: '+54', basePrice: 0.35 },
-  { code: 'CO', name: 'Colombia', flag: '🇨🇴', prefix: '+57', basePrice: 0.30 },
-  { code: 'RO', name: 'Romania', flag: '🇷🇴', prefix: '+40', basePrice: 0.45 },
-  { code: 'UA', name: 'Ukraine', flag: '🇺🇦', prefix: '+380', basePrice: 0.50 },
-  { code: 'RU', name: 'Russia', flag: '🇷🇺', prefix: '+7', basePrice: 0.35 },
-  { code: 'KZ', name: 'Kazakhstan', flag: '🇰🇿', prefix: '+7', basePrice: 0.40 },
-  { code: 'SG', name: 'Singapore', flag: '🇸🇬', prefix: '+65', basePrice: 0.45 },
-  { code: 'NZ', name: 'New Zealand', flag: '🇳🇿', prefix: '+64', basePrice: 0.75 }
+  { code: 'us', name: 'United States', flag: '🇺🇸', prefix: '+1', basePrice: 2.90 },
+  { code: 'gb', name: 'United Kingdom', flag: '🇬🇧', prefix: '+44', basePrice: 0.65 },
+  { code: 'de', name: 'Germany', flag: '🇩🇪', prefix: '+49', basePrice: 0.60 },
+  { code: 'fr', name: 'France', flag: '🇫🇷', prefix: '+33', basePrice: 0.55 },
+  { code: 'ca', name: 'Canada', flag: '🇨🇦', prefix: '+1', basePrice: 0.60 },
+  { code: 'au', name: 'Australia', flag: '🇦🇺', prefix: '+61', basePrice: 0.70 },
+  { code: 'it', name: 'Italy', flag: '🇮🇹', prefix: '+39', basePrice: 0.50 },
+  { code: 'es', name: 'Spain', flag: '🇪🇸', prefix: '+34', basePrice: 0.50 },
+  { code: 'sa', name: 'Saudi Arabia', flag: '🇸🇦', prefix: '+966', basePrice: 0.50 },
+  { code: 'ae', name: 'United Arab Emirates', flag: '🇦🇪', prefix: '+971', basePrice: 0.50 },
+  { code: 'il', name: 'Israel', flag: '🇮🇱', prefix: '+972', basePrice: 0.50 },
+  { code: 'ps', name: 'Palestine', flag: '🇵🇸', prefix: '+970', basePrice: 0.50 },
+  { code: 'tr', name: 'Turkey', flag: '🇹🇷', prefix: '+90', basePrice: 0.50 },
+  { code: 'qa', name: 'Qatar', flag: '🇶🇦', prefix: '+974', basePrice: 0.50 },
+  { code: 'jp', name: 'Japan', flag: '🇯🇵', prefix: '+81', basePrice: 0.50 },
+  { code: 'mg', name: 'Madagascar', flag: '🇲🇬', prefix: '+261', basePrice: 0.50 },
+  { code: 'at', name: 'Austria', flag: '🇦🇹', prefix: '+43', basePrice: 0.50 },
+  { code: 'ng', name: 'Nigeria', flag: '🇳🇬', prefix: '+234', basePrice: 0.50 },
+  { code: 'lt', name: 'Lithuania', flag: '🇱🇹', prefix: '+370', basePrice: 0.50 },
+  { code: 'eg', name: 'Egypt', flag: '🇪🇬', prefix: '+20', basePrice: 0.50 },
+  { code: 'ie', name: 'Ireland', flag: '🇮🇪', prefix: '+353', basePrice: 0.50 },
+  { code: 'ci', name: 'Ivory Coast', flag: '🇨🇮', prefix: '+225', basePrice: 0.50 },
+  { code: 'sg', name: 'Singapore', flag: '🇸🇬', prefix: '+65', basePrice: 0.50 },
+  { code: 'ee', name: 'Estonia', flag: '🇪🇪', prefix: '+372', basePrice: 0.50 },
+  { code: 'vn', name: 'Vietnam', flag: '🇻🇳', prefix: '+84', basePrice: 0.50 },
+  { code: 'ro', name: 'Romania', flag: '🇷🇴', prefix: '+40', basePrice: 0.50 },
+  { code: 'th', name: 'Thailand', flag: '🇹🇭', prefix: '+66', basePrice: 0.50 },
+  { code: 'in', name: 'India', flag: '🇮🇳', prefix: '+91', basePrice: 0.50 },
+  { code: 'ru', name: 'Russia', flag: '🇷🇺', prefix: '+7', basePrice: 0.50 },
+  { code: 'co', name: 'Colombia', flag: '🇨🇴', prefix: '+57', basePrice: 0.50 },
+  { code: 'rs', name: 'Serbia', flag: '🇷🇸', prefix: '+381', basePrice: 0.50 },
+  { code: 'ua', name: 'Ukraine', flag: '🇺🇦', prefix: '+380', basePrice: 0.50 },
+  { code: 'cy', name: 'Cyprus', flag: '🇨🇾', prefix: '+357', basePrice: 0.50 },
+  { code: 'lv', name: 'Latvia', flag: '🇱🇻', prefix: '+371', basePrice: 0.50 },
+  { code: 'my', name: 'Malaysia', flag: '🇲🇾', prefix: '+60', basePrice: 0.50 },
+  { code: 'bo', name: 'Bolivia', flag: '🇧🇴', prefix: '+591', basePrice: 0.50 },
+  { code: 'id', name: 'Indonesia', flag: '🇮🇩', prefix: '+62', basePrice: 0.50 },
+  { code: 'pa', name: 'Panama', flag: '🇵🇦', prefix: '+507', basePrice: 0.50 },
+  { code: 'ph', name: 'Philippines', flag: '🇵🇭', prefix: '+63', basePrice: 0.50 },
+  { code: 'dk', name: 'Denmark', flag: '🇩🇰', prefix: '+45', basePrice: 0.50 },
+  { code: 'ge', name: 'Georgia', flag: '🇬🇪', prefix: '+995', basePrice: 0.50 },
+  { code: 'cm', name: 'Cameroon', flag: '🇨🇲', prefix: '+237', basePrice: 0.50 },
+  { code: 'bj', name: 'Benin', flag: '🇧🇯', prefix: '+229', basePrice: 0.50 },
+  { code: 'nz', name: 'New Zealand', flag: '🇳🇿', prefix: '+64', basePrice: 0.50 },
+  { code: 'ni', name: 'Nicaragua', flag: '🇳🇮', prefix: '+505', basePrice: 0.50 },
+  { code: 'kh', name: 'Cambodia', flag: '🇰🇭', prefix: '+855', basePrice: 0.50 },
+  { code: 'mx', name: 'Mexico', flag: '🇲🇽', prefix: '+52', basePrice: 0.50 },
+  { code: 'kz', name: 'Kazakhstan', flag: '🇰🇿', prefix: '+7', basePrice: 0.50 },
+  { code: 'af', name: 'Afghanistan', flag: '🇦🇫', prefix: '+93', basePrice: 0.50 },
+  { code: 'al', name: 'Albania', flag: '🇦🇱', prefix: '+355', basePrice: 0.50 },
+  { code: 'dz', name: 'Algeria', flag: '🇩🇿', prefix: '+213', basePrice: 0.50 },
+  { code: 'ao', name: 'Angola', flag: '🇦🇴', prefix: '+244', basePrice: 0.50 },
+  { code: 'ar', name: 'Argentina', flag: '🇦🇷', prefix: '+54', basePrice: 0.50 },
+  { code: 'am', name: 'Armenia', flag: '🇦🇲', prefix: '+374', basePrice: 0.50 },
+  { code: 'la', name: 'Laos', flag: '🇱🇦', prefix: '+856', basePrice: 0.50 },
+  { code: 'bd', name: 'Bangladesh', flag: '🇧🇩', prefix: '+880', basePrice: 0.50 },
+  { code: 'za', name: 'South Africa', flag: '🇿🇦', prefix: '+27', basePrice: 0.50 },
+  { code: 'ma', name: 'Morocco', flag: '🇲🇦', prefix: '+212', basePrice: 0.50 },
+  { code: 'mm', name: 'Myanmar', flag: '🇲🇲', prefix: '+95', basePrice: 0.50 },
+  { code: 'tj', name: 'Tajikistan', flag: '🇹🇯', prefix: '+992', basePrice: 0.50 },
+  { code: 'az', name: 'Azerbaijan', flag: '🇦🇿', prefix: '+994', basePrice: 0.50 },
+  { code: 'bh', name: 'Bahrain', flag: '🇧🇭', prefix: '+973', basePrice: 0.50 },
+  { code: 'nl', name: 'Netherlands', flag: '🇳🇱', prefix: '+31', basePrice: 0.50 },
+  { code: 'by', name: 'Belarus', flag: '🇧🇾', prefix: '+375', basePrice: 0.50 },
+  { code: 'bw', name: 'Botswana', flag: '🇧🇼', prefix: '+267', basePrice: 0.50 },
+  { code: 'br', name: 'Brazil', flag: '🇧🇷', prefix: '+55', basePrice: 0.50 },
+  { code: 'bg', name: 'Bulgaria', flag: '🇧🇬', prefix: '+359', basePrice: 0.50 },
+  { code: 'ke', name: 'Kenya', flag: '🇰🇪', prefix: '+254', basePrice: 0.50 },
+  { code: 'tz', name: 'Tanzania', flag: '🇹🇿', prefix: '+255', basePrice: 0.50 },
+  { code: 'kg', name: 'Kyrgyzstan', flag: '🇰🇬', prefix: '+996', basePrice: 0.50 },
+  { code: 'pl', name: 'Poland', flag: '🇵🇱', prefix: '+48', basePrice: 0.50 }
 ];
 
 function generatePhone(prefix) {
@@ -109,7 +148,6 @@ async function createPlisioInvoice(amount, currency, reference, email) {
   var apiKey = process.env.PLISIO_SECRET_KEY;
   if (!apiKey) throw new Error('Plisio API key not configured in .env');
 
-  // Plisio requires GET request with query parameters
   var params = new URLSearchParams({
     source_currency: 'USD',
     source_amount: amount,
@@ -123,7 +161,6 @@ async function createPlisioInvoice(amount, currency, reference, email) {
     api_key: apiKey
   });
 
-  // Notice the GET method and the correct api.plisio.net domain!
   var response = await fetch('https://api.plisio.net/api/v1/invoices/new?' + params.toString(), {
     method: 'GET'
   });
@@ -214,8 +251,22 @@ app.post('/api/numbers/request', async function(req, res) {
   if (useRealProvider) {
     try {
       var provider = require('./sms-provider');
-      var serviceCode = provider.getServiceCode(serviceName);
+      
+      // Pass both ID and Name for exact matching
+      var serviceCode = provider.getServiceCode(serviceName, serviceId);
+      
+      // STOP if service not found in dynamic list
+      if (!serviceCode) {
+        return res.status(400).json({ error: 'This service is currently not supported by our provider.' });
+      }
+
       var countryCodeForProvider = provider.getCountryCode(countryCode);
+      
+      // STOP if country not found in dynamic list
+      if (!countryCodeForProvider) {
+        return res.status(400).json({ error: 'This country is currently not supported by our provider.' });
+      }
+
       var result = await provider.getNumber(serviceCode, countryCodeForProvider);
       if (!result.success) return res.status(400).json({ error: result.error || 'No numbers available. Try a different country.' });
       realPhone = result.phone;
@@ -231,23 +282,30 @@ app.post('/api/numbers/request', async function(req, res) {
   }
 
   db.prepare('UPDATE users SET balance = balance - ? WHERE email = ?').run(cost, email);
-  var insertResult = db.prepare('INSERT INTO numbers (email, service_name, service_id, phone, status, time_left, total_time, cost, provider_request_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(email, serviceName, serviceId, realPhone, 'waiting', 1200, 1200, cost, providerRequestId);
+  var insertResult = db.prepare('INSERT INTO numbers (email, service_name, service_id, phone, status, time_left, total_time, cost, provider_request_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(email, serviceName, serviceId, realPhone, 'waiting', 600, 600, cost, providerRequestId);
+
+  // Add to history so users can see their purchase immediately
+  db.prepare('INSERT INTO history (email, service_name, phone, code, status, cost) VALUES (?, ?, ?, ?, ?, ?)').run(email, serviceName, realPhone, null, 'pending', cost);
 
   if (useRealProvider && providerRequestId) {
     startPolling(insertResult.lastInsertRowid, providerRequestId, serviceName);
   }
 
-  res.json({ id: insertResult.lastInsertRowid, phone: realPhone, status: 'waiting', timeLeft: 1200, totalTime: 1200, cost: cost, balance: user.balance - cost });
+  res.json({ id: insertResult.lastInsertRowid, phone: realPhone, status: 'waiting', timeLeft: 600, totalTime: 600, cost: cost, balance: user.balance - cost });
 });
 
 function startPolling(numberId, providerRequestId, serviceName) {
-  console.log('STARTED POLLING FOR NUMBER:', numberId, 'REQUEST:', providerRequestId);
   var provider = require('./sms-provider');
   var attempts = 0;
+  console.log("[POLL START] Starting polling for Number ID:", numberId, "Provider ID:", providerRequestId);
+  
+  var interval = setInterval(async function() {
     attempts++;
     try {
-    var result = await provider.checkCode(providerRequestId);
-      console.log('POLL CHECK (' + attempts + '):', JSON.stringify(result));
+      console.log("[POLL CHECK " + attempts + "] Checking provider for ID:", providerRequestId);
+      var result = await provider.checkCode(providerRequestId);
+      console.log("[POLL RESULT] Got result:", JSON.stringify(result));
+      
       if (result.success && result.code) {
         clearInterval(interval);
         var smsText = 'Your ' + serviceName + ' verification code is ' + result.code + '. Do not share it with anyone.';
@@ -255,11 +313,17 @@ function startPolling(numberId, providerRequestId, serviceName) {
         db.prepare('INSERT INTO history (email, service_name, phone, code, status, cost) SELECT email, service_name, phone, ?, ?, cost FROM numbers WHERE id = ?').run(result.code, 'success', numberId);
         provider.complete(providerRequestId).catch(function() {});
       }
-      if (result.success === false && result.waiting === false) clearInterval(interval);
+      if (result.success === false && result.waiting === false) {
+        console.log("[POLL STOP] Provider said no longer waiting.");
+        clearInterval(interval);
+      }
     } catch (err) {
-      console.error('Polling error for ' + numberId + ':', err.message);
+      console.error('[POLL ERROR] Error checking code for ' + numberId + ':', err.message);
     }
-    if (attempts >= 120) clearInterval(interval);
+    if (attempts >= 120) {
+      console.log("[POLL STOP] Max attempts reached.");
+      clearInterval(interval);
+    }
   }, 5000);
 }
 
@@ -319,15 +383,50 @@ app.get('/api/deposits/:email', function(req, res) {
 });
 
 // ====== CATCH-ALL ======
-app.use(function(req, res) {
+app.use(function(req, res, next) {
+  if (req.path.startsWith('/api')) return res.status(404).json({ error: 'API route not found' });
+  if (req.path.includes('.')) return res.status(404).send('File not found');
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+// ====== AUTO-LOAD SMS PROVIDER MAPS ON STARTUP ======
+async function loadProviderMaps() {
+  try {
+    var provider = require('./sms-provider');
+    
+    // Fetch Countries
+    var cRes = await fetch('https://sms-bus.com/api/control/list/countries?token=' + process.env.SMS_API_KEY);
+    var cData = await cRes.json();
+    var countryMap = {};
+    if (cData.code === 200 && cData.data) {
+      Object.values(cData.data).forEach(function(c) {
+        countryMap[c.code.toLowerCase()] = String(c.id); // e.g. "gb" -> "25"
+      });
+    }
+
+    // Fetch Services
+    var pRes = await fetch('https://sms-bus.com/api/control/list/projects?token=' + process.env.SMS_API_KEY);
+    var pData = await pRes.json();
+    var serviceMap = {};
+    if (pData.code === 200 && pData.data) {
+      Object.values(pData.data).forEach(function(p) {
+        serviceMap[p.code.toLowerCase()] = String(p.id); // e.g. "tk" -> "3"
+      });
+    }
+
+    // Send the maps to sms-provider.js
+    provider.setMaps(serviceMap, countryMap);
+  } catch (err) {
+    console.error('Failed to auto-load provider maps. Error:', err.message);
+  }
+}
+
+loadProviderMaps();
 
 // ====== START ======
 var PORT = process.env.PORT || 3000;
 var server = app.listen(PORT, function() {
   console.log('Server started on port ' + PORT);
-  console.log('Frontend URL:', process.env.FRONTEND_URL || 'MISSING');
 });
 
 // Fix Railway proxy crashing the server
