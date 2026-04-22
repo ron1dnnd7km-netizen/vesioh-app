@@ -605,55 +605,98 @@ function renderHistoryPage(main) {
 }
         
      
-async function renderSettingsPage(main) {
-  main.innerHTML = '<div class="page-header"><h1 class="page-title">Referral Program</h1></div>' +
-    '<div style="max-width:980px;margin:0 auto;display:grid;gap:22px;">' +
-      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:26px;box-shadow:var(--shadow-sm);">' +
-        '<h2 style="font-size:24px;font-weight:700;margin-bottom:10px;">Recommend the service and earn money</h2>' +
-        '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin-bottom:18px;">Share your referral link with friends and earn 2% of every purchase made by users who sign up through your link.</p>' +
-        '<button class="btn btn-secondary" style="margin-bottom:16px;" onclick="document.querySelectorAll(\'.nav-link\').forEach(function(l){l.classList.remove(\'active\')});document.querySelector(\"[data-page=help]\").classList.add(\'active\');currentPage=\'help\';renderMainContent();">Read more...</button>' +
-      '</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;">' +
-        '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
-          '<div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px;">Your balance</div>' +
-          '<div style="font-size:32px;font-weight:800;color:var(--accent);margin-bottom:8px;" id="referralBalance">$0.00</div>' +
-          '<div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">History of balance is available on the History page.</div>' +
-        '</div>' +
-        '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
-          '<div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px;">Your REF code</div>' +
-          '<div style="font-size:14px;color:var(--text-primary);line-height:1.6;margin-bottom:16px;word-break:break-all;" id="referralLink">Loading your referral link...</div>' +
-          '<button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="copyReferralLink()">Copy referral link</button>' +
-        '</div>' +
-      '</div>' +
-      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
-        '<h3 style="font-size:16px;font-weight:700;margin-bottom:10px;">How it works</h3>' +
-        '<ul style="font-size:14px;color:var(--text-secondary);line-height:1.8;padding-left:18px;margin:0;">' +
-          '<li>You earn 2% of every purchase made by a user who signs up with your referral link.</li>' +
-          '<li>The bonus is automatically added to your balance.</li>' +
-          '<li>Share your referral link on social media, chat, or email to grow your earnings.</li>' +
-        '</ul>' +
-      '</div>' +
-    '</div>';
+// ====== REFERRAL PROGRAM HELPERS ======
+window.generateRefCode = function(length) {
+  length = length || 6;
+  var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  var result = 'REF-';
+  for (var i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
+
+window.toggleReadMore = function() {
+  var short = document.getElementById('refDescShort');
+  var full = document.getElementById('refDescFull');
+  var btn = document.getElementById('readMoreBtn');
+  if (!short || !full || !btn) return;
+  
+  if (full.style.display === 'none') {
+    short.style.display = 'none';
+    full.style.display = 'block';
+    btn.textContent = 'Read less...';
+  } else {
+    short.style.display = 'block';
+    full.style.display = 'none';
+    btn.textContent = 'Read more...';
+  }
+};
+
+window.switchRefTab = function(tab) {
+  var histBtn = document.getElementById('tabBtnHistory');
+  var withdBtn = document.getElementById('tabBtnWithdrawals');
+  var histContent = document.getElementById('refTabHistory');
+  var withdContent = document.getElementById('refTabWithdrawals');
+  
+  if (tab === 'history') {
+    if(histBtn) { histBtn.style.background = 'var(--accent)'; histBtn.style.color = '#fff'; }
+    if(withdBtn) { withdBtn.style.background = 'var(--bg-primary)'; withdBtn.style.color = 'var(--text-secondary)'; }
+    if(histContent) histContent.style.display = 'block';
+    if(withdContent) withdContent.style.display = 'none';
+  } else {
+    if(withdBtn) { withdBtn.style.background = 'var(--accent)'; withdBtn.style.color = '#fff'; }
+    if(histBtn) { histBtn.style.background = 'var(--bg-primary)'; histBtn.style.color = 'var(--text-secondary)'; }
+    if(withdContent) withdContent.style.display = 'block';
+    if(histContent) histContent.style.display = 'none';
+  }
+};
+
+window.requestWithdrawal = async function() {
+  var method = document.getElementById('withdrawMethod');
+  var address = document.getElementById('withdrawAddress');
+  var amount = document.getElementById('withdrawAmount');
+  
+  if(!method || !method.value) { showToast('Select withdrawal method', 'error'); return; }
+  if(!address || !address.value.trim()) { showToast('Enter wallet address or gift card details', 'error'); return; }
+  if(!amount || parseFloat(amount.value) <= 0) { showToast('Enter valid amount', 'error'); return; }
+
+  // Disable button and show loading
+  var btn = document.querySelector('[onclick="requestWithdrawal()"]');
+  var originalText = btn.innerHTML;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+  btn.disabled = true;
 
   try {
-    var res = await fetch('/api/user/' + getUserEmail());
-    if (!res.ok) throw new Error('Unable to load referral data');
+    var res = await fetch('/api/withdraw', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: getUserEmail(),
+        method: method.value,       // "crypto" or "giftcard"
+        address: address.value,     // Wallet address or email
+        amount: parseFloat(amount.value)
+      })
+    });
     var data = await res.json();
-    var referralCode = data.refCode || '';
-    var linkEl = document.getElementById('referralLink');
-    var balanceEl = document.getElementById('referralBalance');
-    var url = referralCode ? window.location.origin + '/?ref=' + referralCode : 'Referral code unavailable';
-    if (linkEl) {
-      linkEl.textContent = url;
-      linkEl.dataset.link = url;
-    }
-    if (balanceEl) {
-      balanceEl.textContent = '$' + (data.balance || 0).toFixed(2);
+    
+    if (data.error) {
+      showToast(data.error, 'error');
+    } else {
+      showToast('Withdrawal request submitted!', 'success');
+      method.value = '';
+      address.value = '';
+      amount.value = '';
+      // Optionally switch to withdrawal history tab
+      switchRefTab('withdrawals');
     }
   } catch (err) {
-    showToast(err.message, 'error');
+    showToast('Network error. Please try again.', 'error');
+  } finally {
+    btn.innerHTML = originalText;
+    btn.disabled = false;
   }
-}
+};
 
 function copyReferralLink() {
   var el = document.getElementById('referralLink');
@@ -662,6 +705,282 @@ function copyReferralLink() {
     return;
   }
   navigator.clipboard.writeText(el.dataset.link).then(function() { showToast('Referral link copied', 'success'); }).catch(function() { showToast('Failed to copy', 'error'); });
+}
+
+// ====== REFERRAL PAGE RENDER ======
+// ====== REFERRAL PROGRAM HELPERS ======
+window.generateRefCode = function(length) {
+  length = length || 6;
+  var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  var result = 'REF-';
+  for (var i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
+
+window.toggleReadMore = function() {
+  var short = document.getElementById('refDescShort');
+  var full = document.getElementById('refDescFull');
+  var btn = document.getElementById('readMoreBtn');
+  if (!short || !full || !btn) return;
+  
+  if (full.style.display === 'none') {
+    short.style.display = 'none';
+    full.style.display = 'block';
+    btn.textContent = 'Read less...';
+  } else {
+    short.style.display = 'block';
+    full.style.display = 'none';
+    btn.textContent = 'Read more...';
+  }
+};
+
+window.switchRefTab = function(tab) {
+  var histBtn = document.getElementById('tabBtnHistory');
+  var withdBtn = document.getElementById('tabBtnWithdrawals');
+  var histContent = document.getElementById('refTabHistory');
+  var withdContent = document.getElementById('refTabWithdrawals');
+  
+  if (tab === 'history') {
+    if(histBtn) { histBtn.style.background = 'var(--accent)'; histBtn.style.color = '#fff'; }
+    if(withdBtn) { withdBtn.style.background = 'var(--bg-primary)'; withdBtn.style.color = 'var(--text-secondary)'; }
+    if(histContent) histContent.style.display = 'block';
+    if(withdContent) withdContent.style.display = 'none';
+  } else {
+    if(withdBtn) { withdBtn.style.background = 'var(--accent)'; withdBtn.style.color = '#fff'; }
+    if(histBtn) { histBtn.style.background = 'var(--bg-primary)'; histBtn.style.color = 'var(--text-secondary)'; }
+    if(withdContent) withdContent.style.display = 'block';
+    if(histContent) histContent.style.display = 'none';
+  }
+};
+
+window.requestWithdrawal = function() {
+  var method = document.getElementById('withdrawMethod');
+  var address = document.getElementById('withdrawAddress');
+  var amount = document.getElementById('withdrawAmount');
+  
+  if(!method || !method.value) { showToast('Select withdrawal method', 'error'); return; }
+  if(!address || !address.value.trim()) { showToast('Enter wallet address or gift card details', 'error'); return; }
+  if(!amount || parseFloat(amount.value) <= 0) { showToast('Enter valid amount', 'error'); return; }
+  
+  // TODO: Connect to your backend API here
+  showToast('Withdrawal request submitted successfully!', 'success');
+};
+
+function copyReferralLink() {
+  var el = document.getElementById('referralLink');
+  if (!el || !el.dataset.link) {
+    showToast('Referral link not ready yet', 'error');
+    return;
+  }
+  navigator.clipboard.writeText(el.dataset.link).then(function() { showToast('Referral link copied', 'success'); }).catch(function() { showToast('Failed to copy', 'error'); });
+}
+
+// ====== REFERRAL PROGRAM HELPERS ======
+window.generateRefCode = function(length) {
+  length = length || 6;
+  var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  var result = 'REF-';
+  for (var i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
+
+window.toggleReadMore = function() {
+  var short = document.getElementById('refDescShort');
+  var full = document.getElementById('refDescFull');
+  var btn = document.getElementById('readMoreBtn');
+  if (!short || !full || !btn) return;
+  
+  if (full.style.display === 'none') {
+    short.style.display = 'none';
+    full.style.display = 'block';
+    btn.textContent = 'Read less...';
+  } else {
+    short.style.display = 'block';
+    full.style.display = 'none';
+    btn.textContent = 'Read more...';
+  }
+};
+
+window.switchRefTab = function(tab) {
+  var histBtn = document.getElementById('tabBtnHistory');
+  var withdBtn = document.getElementById('tabBtnWithdrawals');
+  var histContent = document.getElementById('refTabHistory');
+  var withdContent = document.getElementById('refTabWithdrawals');
+  
+  if (tab === 'history') {
+    if(histBtn) { histBtn.style.background = 'var(--accent)'; histBtn.style.color = '#fff'; }
+    if(withdBtn) { withdBtn.style.background = 'var(--bg-primary)'; withdBtn.style.color = 'var(--text-secondary)'; }
+    if(histContent) histContent.style.display = 'block';
+    if(withdContent) withdContent.style.display = 'none';
+  } else {
+    if(withdBtn) { withdBtn.style.background = 'var(--accent)'; withdBtn.style.color = '#fff'; }
+    if(histBtn) { histBtn.style.background = 'var(--bg-primary)'; histBtn.style.color = 'var(--text-secondary)'; }
+    if(withdContent) withdContent.style.display = 'block';
+    if(histContent) histContent.style.display = 'none';
+  }
+};
+
+window.requestWithdrawal = function() {
+  var method = document.getElementById('withdrawMethod');
+  var address = document.getElementById('withdrawAddress');
+  var amount = document.getElementById('withdrawAmount');
+  
+  if(!method || !method.value) { showToast('Select withdrawal method', 'error'); return; }
+  if(!address || !address.value.trim()) { showToast('Enter wallet address or gift card details', 'error'); return; }
+  if(!amount || parseFloat(amount.value) <= 0) { showToast('Enter valid amount', 'error'); return; }
+  
+  // TODO: Connect to your backend API here
+  showToast('Withdrawal request submitted successfully!', 'success');
+};
+
+function copyReferralLink() {
+  var el = document.getElementById('referralLink');
+  if (!el || !el.dataset.link) {
+    showToast('Referral link not ready yet', 'error');
+    return;
+  }
+  navigator.clipboard.writeText(el.dataset.link).then(function() { showToast('Referral link copied', 'success'); }).catch(function() { showToast('Failed to copy', 'error'); });
+}
+
+// ====== REFERRAL PAGE RENDER ======
+async function renderSettingsPage(main) {
+  
+  // EMPTIED BOTH: Will show empty states until backend provides real data
+  var mockReferrals = []; 
+  var mockWithdrawals = []; 
+
+  var referralHistoryRows = mockReferrals.map(function(r) {
+    return '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;">' +
+      '<div><span style="color:var(--text-muted);">' + r.date + '</span> - ' + r.email + '</div>' +
+      '<div style="font-weight:700;color:var(--accent);">' + r.earned + ' <span style="font-size:10px;color:' + (r.status === 'Paid' ? 'var(--accent)' : 'var(--warning)') + ';">(' + r.status + ')</span></div></div>';
+  }).join('') || '<div style="text-align:center;padding:20px;color:var(--text-muted);">No referrals yet</div>';
+
+  var withdrawalHistoryRows = mockWithdrawals.map(function(w) {
+    return '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;">' +
+      '<div><span style="color:var(--text-muted);">' + w.date + '</span><br><span style="font-size:11px;">' + w.method + '</span></div>' +
+      '<div style="font-weight:700;color:var(--accent);">' + w.amount + ' <span style="font-size:10px;color:var(--accent);">(' + w.status + ')</span></div></div>';
+  }).join('') || '<div style="text-align:center;padding:20px;color:var(--text-muted);">No withdrawals yet</div>';
+
+  main.innerHTML = 
+    '<div class="page-header"><h1 class="page-title">Referral Program</h1></div>' +
+    
+    '<div style="max-width:980px;margin:0 auto;display:grid;gap:22px;">' +
+      
+      // 1. INTRO & READ MORE
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:26px;box-shadow:var(--shadow-sm);">' +
+        '<h2 style="font-size:24px;font-weight:700;margin-bottom:10px;">Recommend the service and earn money</h2>' +
+        '<div id="refDescShort">' +
+          '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin:0;">Share your referral link with friends and earn 5% of every purchase they make.</p>' +
+        '</div>' +
+        '<div id="refDescFull" style="display:none;">' +
+          '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin:0 0 12px 0;">Share your referral link with friends and earn 5% of every purchase made by users who sign up through your link. There is no limit to how much you can earn.</p>' +
+          '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin:0;">The bonus is automatically added to your balance. Share your referral link on social media, chat, or email to grow your earnings. You can withdraw your commissions anytime via Crypto or Gift Cards.</p>' +
+        '</div>' +
+        '<button class="btn btn-secondary" style="margin-top:16px;" id="readMoreBtn" onclick="toggleReadMore()">Read more...</button>' +
+      '</div>' +
+
+      // 2. STATS GRID
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;">' +
+        '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
+          '<div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px;">Total Commissions</div>' +
+          '<div style="font-size:32px;font-weight:800;color:var(--accent);margin-bottom:4px;" id="refTotalCommissions">$0.00</div>' +
+          '<div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">Lifetime earnings</div>' +
+        '</div>' +
+        '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
+          '<div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px;">Referral Count</div>' +
+          '<div style="font-size:32px;font-weight:800;color:var(--text-primary);margin-bottom:4px;" id="refCount">0</div>' +
+          '<div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">Total friends invited</div>' +
+        '</div>' +
+      '</div>' +
+
+      // 3. REFERRAL LINK
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
+        '<div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px;">Your REF code</div>' +
+        '<div style="font-size:14px;color:var(--text-primary);line-height:1.6;margin-bottom:16px;word-break:break-all;" id="referralLink">Loading...</div>' +
+        '<button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="copyReferralLink()"><i class="fas fa-copy" style="margin-right:6px;"></i> Copy referral link</button>' +
+      '</div>' +
+
+      // 4. WITHDRAWAL SECTION
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
+        '<h3 style="font-size:18px;font-weight:700;margin-bottom:20px;"><i class="fas fa-arrow-right-from-bracket" style="color:var(--accent);margin-right:8px;"></i>Withdraw Commissions</h3>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">' +
+          '<div>' +
+            '<label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Withdrawal Method</label>' +
+            '<select id="withdrawMethod" class="form-select" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-primary);color:var(--text-primary);font-size:14px;">' +
+              '<option value="">Select method...</option>' +
+              '<option value="crypto">Crypto (USDT, BTC, ETH)</option>' +
+              '<option value="giftcard">Gift Card (Amazon, Apple)</option>' +
+            '</select>' +
+          '</div>' +
+          '<div>' +
+            '<label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Withdraw ($)</label>' +
+            '<input type="number" id="withdrawAmount" class="form-input" placeholder="0.00" min="1" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-primary);color:var(--text-primary);font-size:14px;">' +
+          '</div>' +
+        '</div>' +
+        '<div style="margin-bottom:20px;">' +
+          '<label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Wallet Address / Gift Card Email</label>' +
+          '<input type="text" id="withdrawAddress" class="form-input" placeholder="Enter your wallet address or email" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-primary);color:var(--text-primary);font-size:14px;">' +
+        '</div>' +
+        '<button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;" onclick="requestWithdrawal()"><i class="fas fa-paper-plane" style="margin-right:6px;"></i> Request Withdrawal</button>' +
+      '</div>' +
+
+      // 5. HISTORY TABS
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
+        '<div style="display:flex;gap:10px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:10px;">' +
+          '<button id="tabBtnHistory" onclick="switchRefTab(\'history\')" style="flex:1;padding:10px;border-radius:8px;border:none;cursor:pointer;font-weight:600;font-size:14px;background:var(--accent);color:#fff;transition:0.2s;">Referral History</button>' +
+          '<button id="tabBtnWithdrawals" onclick="switchRefTab(\'withdrawals\')" style="flex:1;padding:10px;border-radius:8px;border:none;cursor:pointer;font-weight:600;font-size:14px;background:var(--bg-primary);color:var(--text-secondary);transition:0.2s;">Withdrawal History</button>' +
+        '</div>' +
+        '<div id="refTabHistory">' + referralHistoryRows + '</div>' +
+        '<div id="refTabWithdrawals" style="display:none;">' + withdrawalHistoryRows + '</div>' +
+      '</div>' +
+
+    '</div>';
+
+    // --- FETCH DATA FROM BACKEND & POPULATE ---
+  try {
+    var res = await fetch('/api/user/' + getUserEmail());
+    if (!res.ok) throw new Error('Unable to load referral data');
+    var data = await res.json();
+    
+    // 1. Handle Referral Code
+    var referralCode = data.refCode || '';
+    var isEmail = /[@]/.test(referralCode); 
+    
+    // If backend has no code, or mistakenly saved an email, generate a new one
+    if (!referralCode || isEmail) {
+      referralCode = window.generateRefCode(6); 
+      
+      // SAVE IT TO BACKEND so the database knows the new code!
+      try {
+        await fetch('/api/user/refcode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: getUserEmail(), refCode: referralCode })
+        });
+      } catch(e) { console.error("Failed to save ref code to backend", e); }
+    }
+    
+    var url = window.location.origin + '/?ref=' + referralCode;
+    var linkEl = document.getElementById('referralLink');
+    if (linkEl) {
+      linkEl.textContent = url;
+      linkEl.dataset.link = url;
+    }
+
+    // 2. Populate Stats
+    var commEl = document.getElementById('refTotalCommissions');
+    if (commEl) commEl.textContent = '$' + (data.totalCommissions || data.commissions || 0).toFixed(2);
+
+    var countEl = document.getElementById('refCount');
+    if (countEl) countEl.textContent = (data.referralCount || data.refCount || 0);
+
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
 }
 
 function renderHelpPage(main) {
