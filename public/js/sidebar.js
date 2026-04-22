@@ -22,13 +22,15 @@ function renderSidebar(filter = '') {
     const container = groups[service.category];
     if (!container) return;
 
+    var ico = getServiceIconData(service.name, service.id, service.icon);
+
     const item = document.createElement('div');
     item.className = 'service-item';
     item.setAttribute('role', 'button');
     item.setAttribute('tabindex', '0');
     item.setAttribute('aria-label', `${service.name} ${service.region} - $${service.price.toFixed(2)}`);
     item.innerHTML = `
-      <div class="service-icon ${service.iconClass}"><i class="${service.icon}"></i></div>
+      <div class="service-icon" style="background:${ico.bg};color:${ico.color};"><i class="${ico.icon}"></i></div>
       <div class="service-info">
         <div class="service-name">${service.name}</div>
         <div class="service-region">${service.region}</div>

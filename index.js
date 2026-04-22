@@ -234,6 +234,17 @@ app.get('/api/numbers/:email', function(req, res) {
 });
 
 app.post('/api/numbers/request', async function(req, res) {
+  // Example for your backend (Node.js/Express)
+const newNumber = {
+  // ... your existing fields
+  country_code: req.body.countryCode,   // 'us', 'gb', etc.
+  country_flag: req.body.countryFlag,   // '🇺🇸', '🇬🇧', etc.
+  country_name: req.body.countryName,   // 'United States', etc.
+  service_icon: req.body.serviceIcon,   // 'fab fa-whatsapp', etc.
+  service_name: req.body.serviceName,   // 'WhatsApp', etc.
+  service_id: req.body.serviceId,       // 'wa', etc.
+  // ...
+};
   var email = req.body.email;
   var serviceName = req.body.serviceName;
   var serviceId = req.body.serviceId;

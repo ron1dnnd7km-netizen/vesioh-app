@@ -1,3 +1,77 @@
+// ====== API PRICE ENGINE ======
+function addProfit(cost) {
+  if (cost < 0.10) return Math.ceil((cost * 1.40) * 100) / 100;
+  if (cost <= 0.30) return Math.ceil((cost * 1.40) * 100) / 100;
+  if (cost <= 0.39) return Math.ceil((cost * 1.35) * 100) / 100;
+  if (cost < 0.80) return Math.ceil((cost * 1.35) * 100) / 100; // Changed to < 0.80
+  
+  // 0.80 to 0.99 is now 15% profit
+  if (cost < 1.00) return Math.ceil((cost * 1.15) * 100) / 100;
+  
+  // 1.00 upward is 10% profit
+  return Math.ceil((cost * 1.10) * 100) / 100;
+}
+
+var SMS_API_TOKEN = 'd4a7951968ed4e59a647a0ac1d1af637';
+var SMS_API_BASE = 'https://sms-bus.com/api/control/list';
+
+var countryIdMap = {
+  ru:1, ua:4, us:5, my:6, id:7, ph:8, in:14, ca:13, ro:11, vn:10,
+  gb:25, la:32, nl:189, fr:80, pl:229, dk:206, nz:69, sg:158, de:48, it:88,
+  es:190, sa:191, ae:192, il:193, ps:194, tr:195, qa:196, jp:197, at:198,
+  lt:199, ng:231, eg:232, ie:233, ci:234, ee:235, usv:236, lv:203, co:200,
+  rs:201, cy:202, bo:204, pa:205, ge:207, cm:208, bj:209, ni:210, kh:211,
+  mx:212, kz:213, af:214, al:215, dz:216, ao:217, ar:218, am:219, bd:183,
+  za:184, ma:185, mm:186, tj:187, az:220, au:188, bh:221, by:222, bw:223,
+  br:224, bg:225, ke:226, tz:227, kg:228, mg:230
+};
+
+var priceCache = {};
+
+try {
+  var _savedCache = localStorage.getItem('priceCache');
+  if (_savedCache) Object.assign(priceCache, JSON.parse(_savedCache));
+} catch(e) {}
+
+function fetchPricesForCountry(countryCode) {
+  if (priceCache[countryCode]) return Promise.resolve(priceCache[countryCode]);
+  var countryId = countryIdMap[countryCode];
+  if (!countryId) return Promise.resolve(null);
+  return fetch(SMS_API_BASE + '/prices?token=' + SMS_API_TOKEN + '&country_id=' + countryId)
+    .then(function(res) { return res.json(); })
+    .then(function(json) {
+      if (json.code !== 200) return null;
+      var prices = {};
+      for (var key in json.data) {
+        var item = json.data[key];
+        prices[item.project_code] = addProfit(item.cost);
+      }
+      priceCache[countryCode] = prices;
+      try { localStorage.setItem('priceCache', JSON.stringify(priceCache)); } catch(e) {}
+      return prices;
+    })
+    .catch(function(e) { console.error('Price fetch failed:', countryCode, e); return null; });
+}
+
+function getServicePrice(service, countryCode) {
+  var cached = priceCache[countryCode];
+  if (cached && cached[service.id] !== undefined) return cached[service.id];
+  if (service.price !== undefined) return service.price;
+  return 0.50;
+}
+
+function isServiceAvailable(service, countryCode) {
+  var cached = priceCache[countryCode];
+  if (cached && Object.keys(cached).length > 0 && cached[service.id] === undefined) return false;
+  return true;
+}
+
+function clearPriceCache() {
+  for (var key in priceCache) delete priceCache[key];
+  localStorage.removeItem('priceCache');
+}
+
+
 // ====== EDIT SERVICES HERE ======
 // To add a new service: copy one block, change values
 // iconClass options: fb, fiverr, wa, telegram, twitter, amazon,
@@ -390,4 +464,4 @@ const countries = [
 // Using window. makes everyone share one object.
 window.activeNumbers = [];
 window.historyData = [];
-window.balance = 6.00;
+window.balance = 0.00;
