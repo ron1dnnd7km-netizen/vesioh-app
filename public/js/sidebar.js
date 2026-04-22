@@ -30,7 +30,7 @@ function renderSidebar(filter = '') {
     item.setAttribute('tabindex', '0');
     item.setAttribute('aria-label', `${service.name} ${service.region} - $${service.price.toFixed(2)}`);
     item.innerHTML = `
-      <div class="service-icon" style="background:${ico.bg};color:${ico.color};"><i class="${ico.icon}"></i></div>
+      <div class="service-icon" style="background:${ico.bg};color:${ico.color};">${ico.html}</div>
       <div class="service-info">
         <div class="service-name">${service.name}</div>
         <div class="service-region">${service.region}</div>

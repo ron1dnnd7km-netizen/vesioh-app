@@ -4,7 +4,104 @@ function getServiceIconData(serviceName, serviceId, existingIcon) {
   var id = (serviceId || '').toLowerCase();
   var icon = (existingIcon || '').trim();
   
+  // CHECK IF IT'S A REAL IMAGE URL
+  var isImage = /\.(png|jpg|jpeg|gif|svg|webp)(\?.*)?$/i.test(icon) || icon.indexOf('http') === 0 || icon.indexOf('/') === 0;
+  if (isImage) {
+    return { 
+      html: '<img src="' + icon + '" style="width:100%;height:100%;object-fit:contain;" onerror="this.outerHTML=\'<i class=fas fa-globe></i>\'">', 
+      color: '#374151', 
+      bg: 'rgba(0,0,0,0.04)' 
+    };
+  }
+  
   // Map of icon class → brand color
+    // CHECK IF IT'S A REAL IMAGE URL
+  var isImage = /\.(png|jpg|jpeg|gif|svg|webp)(\?.*)?$/i.test(icon) || icon.indexOf('http') === 0 || icon.indexOf('/') === 0;
+  if (isImage) {
+    return { 
+      html: '<img src="' + icon + '" style="width:100%;height:100%;object-fit:contain;" onerror="this.outerHTML=\'<i class=fas fa-globe></i>\'">', 
+      color: '#374151', 
+      bg: 'rgba(0,0,0,0.04)' 
+    };
+  }
+
+  // ===== FORCE REAL LOGOS BY SERVICE NAME =====
+  var nameImageMap = {
+    'whatsapp': 'https://upload.wikimedia.org/wikipedia/commons/a/a7/2062095_application_chat_communication_logo_whatsapp_icon.svg',
+    'telegram': 'https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg',
+    'facebook': 'https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg',
+    'instagram': 'https://upload.wikimedia.org/wikipedia/commons/9/95/Instagram_logo_2022.svg',
+    'tiktok': 'https://upload.wikimedia.org/wikipedia/commons/6/61/Tiktok_hyper.png',
+    'google': 'https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg',
+    'netflix': 'https://upload.wikimedia.org/wikipedia/commons/0/09/Netflix_Icon.svg',
+    'twitter': 'https://upload.wikimedia.org/wikipedia/commons/c/ce/X_logo_2023.svg',
+    'x ': 'https://upload.wikimedia.org/wikipedia/commons/c/ce/X_logo_2023.svg',
+    'discord': 'https://upload.wikimedia.org/wikipedia/fr/4/4f/Discord_Logo_sans_text.svg',
+    'steam': 'https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg',
+    'uber': 'https://upload.wikimedia.org/wikipedia/commons/5/58/Uber_logo_2018.svg',
+    'spotify': 'https://upload.wikimedia.org/wikipedia/commons/1/19/Spotify_logo_without_text.svg',
+    'twitch': 'https://upload.wikimedia.org/wikipedia/commons/d/d0/Twitch_logo.svg',
+    'linkedin': 'https://upload.wikimedia.org/wikipedia/commons/0/01/LinkedIn_Logo.svg',
+    'snapchat': 'https://upload.wikimedia.org/wikipedia/commons/e/e5/Snapchat_logo.svg',
+    'pinterest': 'https://upload.wikimedia.org/wikipedia/commons/5/53/Pinterest_logo.svg',
+    'reddit': 'https://upload.wikimedia.org/wikipedia/commons/9/95/Reddit_logo_and_wordmark.svg',
+    'youtube': 'https://upload.wikimedia.org/wikipedia/commons/0/09/YouTube_full-color_icon_%282017%29.svg',
+    'fiverr': 'https://upload.wikimedia.org/wikipedia/commons/5/51/Fiverr_logo.svg',
+    'ebay': 'https://upload.wikimedia.org/wikipedia/commons/1/1b/EBay_logo.svg',
+    'apple': 'https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg',
+    'microsoft': 'https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg',
+    'amazon': 'https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg',
+    'paypal': 'https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal_logo_%28old%29.svg',
+    'venmo': 'https://upload.wikimedia.org/wikipedia/commons/8/85/Venmo_logo_2021.svg',
+    'cash app': 'https://upload.wikimedia.org/wikipedia/commons/3/3f/Square_Cash_App_logo.svg',
+    'binance': 'https://upload.wikimedia.org/wikipedia/commons/d/d0/Binance_logo.svg',
+    'coinbase': 'https://upload.wikimedia.org/wikipedia/commons/8/86/Coinbase_logo.svg',
+    'airbnb': 'https://upload.wikimedia.org/wikipedia/commons/6/69/Airbnb_Logo_B%C3%A9lo.svg',
+    'booking': 'https://upload.wikimedia.org/wikipedia/commons/2/29/Booking.com_logo.svg',
+    'booking.com': 'https://upload.wikimedia.org/wikipedia/commons/2/29/Booking.com_logo.svg',
+    'nike': 'https://upload.wikimedia.org/wikipedia/commons/a/a6/Logo_NIKE.svg',
+    'openai': 'https://upload.wikimedia.org/wikipedia/commons/4/4d/OpenAI_Logo.svg',
+    'chatgpt': 'https://upload.wikimedia.org/wikipedia/commons/4/4d/OpenAI_Logo.svg',
+    'viber': 'https://upload.wikimedia.org/wikipedia/commons/9/9e/Viber_logo.svg',
+    'signal': 'https://upload.wikimedia.org/wikipedia/commons/6/60/Signal-Logo-Ultramarine_%282024%29.svg',
+    'skype': 'https://upload.wikimedia.org/wikipedia/commons/7/7e/Skype_logo_%282019%E2%80%93present%29.svg',
+    'line': 'https://upload.wikimedia.org/wikipedia/commons/3/3e/LINE_logo.svg',
+    'vk': 'https://upload.wikimedia.org/wikipedia/commons/f/f7/VKontakte_logo.svg',
+    'tinder': 'https://upload.wikimedia.org/wikipedia/commons/c/cb/Tinder_logo.svg',
+    'bumble': 'https://upload.wikimedia.org/wikipedia/commons/b/b0/Bumble_logo.svg',
+    'hinge': 'https://upload.wikimedia.org/wikipedia/commons/5/5f/Hinge_logo.svg',
+    'yandex': 'https://upload.wikimedia.org/wikipedia/commons/5/51/Yandex_logo.svg',
+    'baidu': 'https://upload.wikimedia.org/wikipedia/commons/9/91/Baidu_logo.svg',
+    'shopee': 'https://upload.wikimedia.org/wikipedia/commons/8/8e/Shopee_logo.svg',
+    'temu': 'https://upload.wikimedia.org/wikipedia/commons/a/a7/Temu_logo.svg',
+    'shein': 'https://upload.wikimedia.org/wikipedia/commons/8/82/Shein_logo.svg',
+    'walmart': 'https://upload.wikimedia.org/wikipedia/commons/1/14/Walmart_logo.svg',
+    'truecaller': 'https://upload.wikimedia.org/wikipedia/commons/4/4d/Truecaller_logo.svg',
+    'authy': 'https://upload.wikimedia.org/wikipedia/commons/4/40/Authy_logo.svg',
+    'chime': 'https://upload.wikimedia.org/wikipedia/commons/d/d8/Chime_logo.svg',
+    'nvidia': 'https://upload.wikimedia.org/wikipedia/commons/2/22/Nvidia_logo.svg',
+    'badoo': 'https://upload.wikimedia.org/wikipedia/commons/7/7e/Badoo_logo.svg',
+    'vk': 'https://upload.wikimedia.org/wikipedia/commons/f/f7/VKontakte_logo.svg',
+    'roblox': 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Roblox_logo.svg',
+    'pubg': 'https://upload.wikimedia.org/wikipedia/commons/2/28/PUBG_logo.svg',
+    'slack': 'https://upload.wikimedia.org/wikipedia/commons/d/d5/Slack_icon_2019.svg',
+    'github': 'https://upload.wikimedia.org/wikipedia/commons/9/91/GitHub_logo.svg',
+    'snapchat': 'https://upload.wikimedia.org/wikipedia/commons/e/e5/Snapchat_logo.svg',
+    'alipay': 'https://upload.wikimedia.org/wikipedia/commons/d/d5/Alipay_logo_%282021%29.svg',
+  };
+  
+  // Check if service name matches a known brand with a real logo
+  var nameKeys = Object.keys(nameImageMap).sort(function(a, b) { return b.length - a.length; });
+  for (var img_i = 0; img_i < nameKeys.length; img_i++) {
+    if (name.indexOf(nameKeys[img_i]) !== -1) {
+      var imgUrl = nameImageMap[nameKeys[img_i]];
+      return {
+        html: '<img src="' + imgUrl + '" style="width:100%;height:100%;object-fit:contain;" onerror="this.outerHTML=\'<i class=fas fa-globe></i>\'">',
+        color: '#374151',
+        bg: 'rgba(0,0,0,0.04)'
+      };
+    }
+  }
   var iconColorMap = {
     'fab fa-whatsapp':        { color: '#25D366', bg: 'rgba(37,211,102,0.12)' },
     'fab fa-whatsapp-plane':  { color: '#26A5E4', bg: 'rgba(38,165,228,0.12)' },
@@ -57,13 +154,12 @@ function getServiceIconData(serviceName, serviceId, existingIcon) {
     'fab fa-apple':           { color: '#000000', bg: 'rgba(0,0,0,0.08)' },
     'fab fa-slack':           { color: '#4A154B', bg: 'rgba(74,21,75,0.12)' },
     'fab fa-github':          { color: '#181717', bg: 'rgba(24,23,23,0.10)' },
-    'fab fa-ethereum':        { color: '#627EEA', bg: 'rgba(98,126,234,0.12)' },
   };
 
   // 1) If data.js already has an icon, use it with brand color
   if (icon && iconColorMap[icon]) {
     var mapped = iconColorMap[icon];
-    return { icon: icon, color: mapped.color, bg: mapped.bg };
+    return { html: '<i class="' + icon + '"></i>', color: mapped.color, bg: mapped.bg };
   }
 
   // 2) Name/ID based mapping for services with generic icons in data.js
@@ -89,7 +185,6 @@ function getServiceIconData(serviceName, serviceId, existingIcon) {
     'fiverr':                { icon: 'fab fa-font-awesome',   color: '#00B22D', bg: 'rgba(0,178,45,0.12)' },
     'snapchat':              { icon: 'fab fa-snapchat',       color: '#FFFC00', bg: 'rgba(255,252,0,0.18)' },
     'linkedin':              { icon: 'fab fa-linkedin-in',    color: '#0A66C2', bg: 'rgba(10,102,194,0.12)' },
-    'vkontakte':             { icon: 'fab fa-vk',             color: '#0077FF', bg: 'rgba(0,119,255,0.12)' },
     'vkontakte':             { icon: 'fab fa-vk',             color: '#0077FF', bg: 'rgba(0,119,255,0.12)' },
     'в контакте':            { icon: 'fab fa-vk',             color: '#0077FF', bg: 'rgba(0,119,255,0.12)' },
     'skype':                 { icon: 'fab fa-skype',          color: '#00AFF0', bg: 'rgba(0,175,240,0.12)' },
@@ -199,7 +294,7 @@ function getServiceIconData(serviceName, serviceId, existingIcon) {
   // Match by name (longer keys first)
   var keys = Object.keys(nameMap).sort(function(a, b) { return b.length - a.length; });
   for (var i = 0; i < keys.length; i++) {
-    if (name.indexOf(keys[i]) !== -1) return nameMap[keys[i]];
+     if (name.indexOf(keys[i]) !== -1) { var m = nameMap[keys[i]]; return { html: '<i class="' + m.icon + '"></i>', color: m.color, bg: m.bg }; }
   }
   
   // Match by id
@@ -208,15 +303,15 @@ function getServiceIconData(serviceName, serviceId, existingIcon) {
     'tk': 'tiktok', 'tw': 'twitter', 'vb': 'viber', 'sk': 'skype',
     'nf': 'netflix', 'ub': 'uber', 'gv': 'google'
   };
-  if (idMap[id]) return nameMap[idMap[id]];
+  if (idMap[id]) { var m2 = nameMap[idMap[id]]; return { html: '<i class="' + m2.icon + '"></i>', color: m2.color, bg: m2.bg }; }
   
   // If data.js had an icon but no color match, use generic dark color
   if (icon) {
-    return { icon: icon, color: '#374151', bg: 'rgba(55,65,81,0.08)' };
+    return { html: '<i class="' + icon + '"></i>', color: '#374151', bg: 'rgba(55,65,81,0.08)' };
   }
   
   // Default fallback
-  return { icon: 'fas fa-mobile-alt', color: 'var(--text-secondary)', bg: 'rgba(0,0,0,0.05)' };
+  return { html: '<i class="fas fa-mobile-alt"></i>', color: 'var(--text-secondary)', bg: 'rgba(0,0,0,0.05)' };
 }
 
 function renderNumbersPage(main) {
@@ -228,7 +323,6 @@ function renderNumbersPage(main) {
     ? waitingNumbers.map(renderActiveNumberCard).join('')
     : '<div style="padding:22px;border:1px dashed var(--border);border-radius:14px;color:var(--text-secondary);font-size:14px;">No active numbers yet. Buy one from below.</div>';
 
-  // ====== MOBILE SEARCH BAR ======
   var mobileSearchHTML = '<div class="mobile-search-wrapper" style="margin-bottom:20px;">' +
     '<div style="position:relative;">' +
       '<i class="fas fa-search" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:13px;"></i>' +
@@ -236,7 +330,6 @@ function renderNumbersPage(main) {
     '</div>' +
   '</div>';
 
-  // ====== SERVICE GRID (Now First!) ======
   var serviceGridHTML = '<div id="mobileServiceGridWrapper" style="margin-bottom:28px;">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">' +
       '<h2 style="font-size:18px;font-weight:700;display:flex;align-items:center;gap:10px;">' +
@@ -247,7 +340,6 @@ function renderNumbersPage(main) {
     '</div>' +
   '</div>';
 
-  // ====== ACTIVE NUMBERS (Now Second!) ======
   var activeSectionHTML = '<div id="activeNumbersSection" style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);margin-bottom:28px;">' +
     '<div>' +
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">' +
@@ -259,7 +351,6 @@ function renderNumbersPage(main) {
     '</div>' +
   '</div>';
 
-  // ====== INFO SECTIONS (At the bottom) ======
   var infoSectionsHTML = 
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-bottom:28px;">' +
       '<div style="background:rgba(13,155,122,0.08);border:1px solid rgba(13,155,122,0.2);border-radius:12px;padding:16px;box-shadow:var(--shadow-sm);">' +
@@ -282,7 +373,6 @@ function renderNumbersPage(main) {
       '<p style="font-size:14px;color:var(--text-secondary);line-height:1.8;"><strong>Bypass regional restrictions</strong> — Temporary numbers from different countries allow you to register on platforms without geographic barriers.</p>' +
     '</div>';
 
-  // ====== FINAL RENDER (New Order!) ======
   main.innerHTML = 
     mobileSearchHTML + 
     serviceGridHTML + 
@@ -382,7 +472,7 @@ function renderActiveNumberCard(n) {
     '<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:150px;">' +
       '<div style="font-size:18px;flex-shrink:0;">' + countryFlag + '</div>' +
       '<div style="width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:' + ico.bg + ';color:' + ico.color + ';">' +
-        '<i class="' + ico.icon + '"></i>' +
+        ico.html +
       '</div>' +
       '<div style="font-family:JetBrains Mono,monospace;font-size:13px;font-weight:700;word-break:break-all;">' + phoneDisplay + '</div>' +
       '<button class="btn-sm copy" onclick="copyNumber(\'' + phoneCopy + '\')" style="padding:4px 6px;font-size:10px;flex-shrink:0;"><i class="fas fa-copy"></i></button>' +
@@ -414,14 +504,14 @@ function getDashboardServiceListHTML() {
       'onmouseout="this.style.boxShadow=\'var(--shadow-sm)\';this.style.borderColor=\'var(--border)\'" ' +
       'onclick="openModalById(\'' + id + '\')">' +
       '<div style="width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:18px;background:' + ico.bg + ';color:' + ico.color + ';">' +
-      '<i class="' + ico.icon + '"></i></div>' +
+      ico.html + '</div>' +
       '<div style="font-size:12px;font-weight:600;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + name + '</div>' +
       (availableText ? '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + availableText + '</div>' : '') +
       '<div style="font-size:13px;font-weight:700;color:var(--accent);">$' + price + '</div></div>';
   }).join('');
 }
 
-  function renderHistoryPage(main) {
+function renderHistoryPage(main) {
   var rows = '';
   if (historyData.length === 0) {
     rows = '<div class="empty-state"><i class="fas fa-history"></i><h3>No history yet</h3><p>Your SMS code history will appear here</p></div>';
@@ -496,7 +586,7 @@ function getDashboardServiceListHTML() {
         '<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:150px;">' +
           '<div style="font-size:18px;flex-shrink:0;">' + countryFlag + '</div>' +
           '<div style="width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:' + ico.bg + ';color:' + ico.color + ';">' +
-            '<i class="' + ico.icon + '"></i>' +
+           ico.html +
           '</div>' +
           '<div style="font-family:JetBrains Mono,monospace;font-size:13px;font-weight:700;word-break:break-all;">' + phoneDisplay + '</div>' +
           '<button class="btn-sm copy" onclick="copyNumber(\'' + phoneCopy + '\')" style="padding:4px 6px;font-size:10px;flex-shrink:0;"><i class="fas fa-copy"></i></button>' +
@@ -889,6 +979,8 @@ window.openModalById = function(serviceId) {
     return '<option value="' + c.code + '">' + c.flag + ' ' + c.name + '</option>';
   }).join('');
 
+  var mi = getServiceIconData(service.name, service.id, service.icon);
+
   var modalHTML = '<div class="modal-overlay show" id="buyModalOverlay" onclick="if(event.target===this)closeBuyModal()">' +
     '<div class="modal" style="width:440px;">' +
       '<div class="modal-header">' +
@@ -896,8 +988,12 @@ window.openModalById = function(serviceId) {
         '<button class="modal-close" onclick="closeBuyModal()"><i class="fas fa-times"></i></button>' +
       '</div>' +
       '<div class="modal-body">' +
+        // === REAL IMAGE PREVIEW ===
+        '<div class="service-image-preview" id="servicePreview" style="display:' + (service.image ? 'flex' : 'none') + ';">' +
+          '<img id="serviceImage" src="' + (service.image || '') + '" alt="' + service.name + '" onerror="this.parentElement.style.display=\'none\'">' +
+        '</div>' +
         '<div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;padding:14px;background:var(--bg-primary);border-radius:12px;border:1px solid var(--border);">' +
-         (function() { var mi = getServiceIconData(service.name, service.id, service.icon); return '<div style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;background:' + mi.bg + ';color:' + mi.color + ';"><i class="' + mi.icon + '"></i></div>'; })() +
+         '<div style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;background:' + mi.bg + ';color:' + mi.color + ';">' + mi.html + '</div>' +
           '<div style="flex:1;">' +
             '<div style="font-size:16px;font-weight:700;">' + service.name + '</div>' +
             '<div id="modalPriceDisplay" style="font-size:13px;color:var(--accent);font-weight:600;">$' + service.price.toFixed(2) + '</div>' +
@@ -920,7 +1016,6 @@ window.openModalById = function(serviceId) {
 
   document.body.insertAdjacentHTML('beforeend', modalHTML);
 
-  // Fetch real price for the default country (first in list = gb)
   updateModalPrice();
 };
 
@@ -940,7 +1035,6 @@ window.updateModalPrice = function() {
   var buyBtn = document.getElementById('finalBuyBtn');
   if (!priceEl) return;
 
-  // Check cache first
   var cached = priceCache[countryCode];
   if (cached && Object.keys(cached).length > 0) {
     if (cached[service.id] !== undefined) {
@@ -958,7 +1052,6 @@ window.updateModalPrice = function() {
     return;
   }
 
-  // Show loading
   priceEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading price...';
   priceEl.style.color = 'var(--text-muted)';
   if (buyBtn) { buyBtn.disabled = true; }
@@ -987,7 +1080,7 @@ window.updateModalPrice = function() {
   });
 };
 
-  window.executeBuyNumber = function() {
+window.executeBuyNumber = function() {
   if (!window.selectedBuyService || !window.selectedBuyService.id) {
     showToast('Please select a service.', 'error');
     return;
@@ -1008,7 +1101,6 @@ window.updateModalPrice = function() {
   var countryDropdown = document.getElementById('countrySelect');
   var countryCode = countryDropdown ? countryDropdown.value : 'us';
   
-  // LOOK UP COUNTRY FLAG FROM countries ARRAY
   var countryData = countries.find(function(c) { return c.code === countryCode; });
   var countryFlag = countryData ? countryData.flag : '🏳️';
   var countryName = countryData ? countryData.name : 'Unknown';
