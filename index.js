@@ -13,7 +13,6 @@ try {
   process.exit(1);
 }
 
-// FIXED: Changed all country codes to lowercase ISO standards to match frontend
 const countries = [
   { code: 'us', name: 'United States', flag: '🇺🇸', prefix: '+1', basePrice: 2.90 },
   { code: 'gb', name: 'United Kingdom', flag: '🇬🇧', prefix: '+44', basePrice: 0.65 },
@@ -92,42 +91,36 @@ function generatePhone(prefix) {
   return prefix + ' ' + Math.floor(Math.random() * 900 + 100) + ' ' + Math.floor(Math.random() * 900 + 100) + ' ' + Math.floor(Math.random() * 9000 + 1000);
 }
 
-function sortObjectKeys(obj) {
-  if (typeof obj !== 'object' || obj === null) return obj;
-  if (Array.isArray(obj)) return obj.map(sortObjectKeys);
-  var sorted = {};
-  Object.keys(obj).sort().forEach(function(key) {
-    sorted[key] = sortObjectKeys(obj[key]);
-  });
-  return sorted;
-}
-
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ====== AUTH ======
-app.post('/api/auth/signup', function(req, res) {
+app.post('/api/auth/signup', async function(req, res) {
   var email = req.body.email;
   var password = req.body.password;
   if (!email || !password) return res.status(400).json({ error: 'All fields are required' });
   if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
-  var existing = db.prepare('SELECT email FROM users WHERE email = ?').get(email);
+  
+  var existing = await db.prepare('SELECT email FROM users WHERE email = $1').get(email);
   if (existing) return res.status(400).json({ error: 'Email already registered' });
+  
   var hash = bcrypt.hashSync(password, 10);
-  db.prepare('INSERT INTO users (email, password, balance) VALUES (?, ?, 0.00)').run(email, hash);
-    res.json({ email: email, message: 'Account created successfully.' });
+  await db.prepare('INSERT INTO users (email, password, balance) VALUES ($1, $2, DEFAULT)').run(email, hash);
+  res.json({ email: email, message: 'Account created successfully.' });
 });
 
-app.post('/api/auth/login', function(req, res) {
+app.post('/api/auth/login', async function(req, res) {
   var email = req.body.email;
   var password = req.body.password;
   if (!email || !password) return res.status(400).json({ error: 'All fields are required' });
-  var user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+  
+  var user = await db.prepare('SELECT * FROM users WHERE email = $1').get(email);
   if (!user) return res.status(400).json({ error: 'Invalid email or password' });
   if (!user.password) return res.status(400).json({ error: 'This account has no password set' });
   if (!bcrypt.compareSync(password, user.password)) return res.status(400).json({ error: 'Invalid email or password' });
+  
   res.json({ email: user.email, name: user.name });
 });
 
@@ -137,8 +130,8 @@ app.post('/api/auth/forgot-password', function(req, res) {
 });
 
 // ====== USER ======
-app.get('/api/user/:email', function(req, res) {
-  var user = db.prepare('SELECT balance, email as refCode FROM users WHERE email = ?').get(req.params.email);
+app.get('/api/user/:email', async function(req, res) {
+  var user = await db.prepare('SELECT balance, email as refCode FROM users WHERE email = $1').get(req.params.email);
   if (!user) return res.status(404).json({ error: 'User not found' });
   res.json({ balance: user.balance, refCode: user.refCode });
 });
@@ -161,18 +154,11 @@ async function createPlisioInvoice(amount, currency, reference, email) {
     api_key: apiKey
   });
 
-  var response = await fetch('https://api.plisio.net/api/v1/invoices/new?' + params.toString(), {
-    method: 'GET'
-  });
-
+  var response = await fetch('https://api.plisio.net/api/v1/invoices/new?' + params.toString(), { method: 'GET' });
   var data = await response.json();
 
-  if (data.status !== 'success') {
-    throw new Error(data.data.message || 'Plisio error');
-  }
-  if (!data.data.invoice_url) {
-    throw new Error('No invoice URL returned from Plisio');
-  }
+  if (data.status !== 'success') throw new Error(data.data.message || 'Plisio error');
+  if (!data.data.invoice_url) throw new Error('No invoice URL returned from Plisio');
   return data.data;
 }
 
@@ -187,38 +173,37 @@ app.post('/api/deposit/nowpayments', async function(req, res) {
   if (amount > 1000) return res.status(400).json({ error: 'Maximum deposit is $1,000.00' });
 
   var reference = 'DEP-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-  db.prepare('INSERT INTO deposits (email, amount, method, status, reference, pay_currency) VALUES (?, ?, ?, ?, ?, ?)').run(email, amount, 'crypto', 'pending', reference, payCurrency);
+  
+  await db.prepare('INSERT INTO deposits (email, amount, method, status, reference, pay_currency) VALUES ($1, $2, $3, $4, $5, $6)').run(email, amount, 'crypto', 'pending', reference, payCurrency);
 
   try {
     var result = await createPlisioInvoice(amount, payCurrency, reference, email);
     res.json({ success: true, invoice_url: result.invoice_url, reference: reference });
   } catch (err) {
     console.error('Crypto deposit error:', err.message);
-    db.prepare('UPDATE deposits SET status = ? WHERE reference = ?').run('failed', reference);
+    await db.prepare('UPDATE deposits SET status = $1 WHERE reference = $2').run('failed', reference);
     res.status(500).json({ error: 'Payment error: ' + err.message });
   }
 });
 
 // ====== PLISIO CALLBACK ======
-app.post('/api/deposit/plisio-callback', function(req, res) {
+app.post('/api/deposit/plisio-callback', async function(req, res) {
   try {
     var status = req.body.status;
     var orderId = req.body.order_number;
-
     console.log('Plisio callback: status=' + status + ' order=' + orderId);
 
     if (status === 'completed') {
-      var deposit = db.prepare('SELECT * FROM deposits WHERE reference = ? AND status = ?').get(orderId, 'pending');
+      var deposit = await db.prepare('SELECT * FROM deposits WHERE reference = $1 AND status = $2').get(orderId, 'pending');
       if (deposit) {
         var creditAmount = parseFloat(req.body.source_amount) || deposit.amount;
-        db.prepare('UPDATE deposits SET status = ? WHERE reference = ?').run('completed', orderId);
-        db.prepare('UPDATE users SET balance = balance + ? WHERE email = ?').run(creditAmount, deposit.email);
+        await db.prepare('UPDATE deposits SET status = $1 WHERE reference = $2').run('completed', orderId);
+        await db.prepare('UPDATE users SET balance = balance + $1 WHERE email = $2').run(creditAmount, deposit.email);
         console.log('Credited: ' + orderId + ' $' + creditAmount + ' -> ' + deposit.email);
       }
     } else if (status === 'expired' || status === 'cancelled') {
-      db.prepare('UPDATE deposits SET status = ? WHERE reference = ? AND status = ?').run('failed', orderId, 'pending');
+      await db.prepare('UPDATE deposits SET status = $1 WHERE reference = $2 AND status = $3').run('failed', orderId, 'pending');
     }
-
     res.json({ status: 'ok' });
   } catch (err) {
     console.error('Callback error:', err.message);
@@ -226,32 +211,20 @@ app.post('/api/deposit/plisio-callback', function(req, res) {
   }
 });
 
-
 // ====== NUMBERS ======
-app.get('/api/numbers/:email', function(req, res) {
-  var rows = db.prepare('SELECT * FROM numbers WHERE email = ? ORDER BY created_at DESC').all(req.params.email);
+app.get('/api/numbers/:email', async function(req, res) {
+  var rows = await db.prepare('SELECT * FROM numbers WHERE email = $1 ORDER BY created_at DESC').all(req.params.email);
   res.json(rows);
 });
 
 app.post('/api/numbers/request', async function(req, res) {
-  // Example for your backend (Node.js/Express)
-const newNumber = {
-  // ... your existing fields
-  country_code: req.body.countryCode,   // 'us', 'gb', etc.
-  country_flag: req.body.countryFlag,   // '🇺🇸', '🇬🇧', etc.
-  country_name: req.body.countryName,   // 'United States', etc.
-  service_icon: req.body.serviceIcon,   // 'fab fa-whatsapp', etc.
-  service_name: req.body.serviceName,   // 'WhatsApp', etc.
-  service_id: req.body.serviceId,       // 'wa', etc.
-  // ...
-};
   var email = req.body.email;
   var serviceName = req.body.serviceName;
   var serviceId = req.body.serviceId;
   var countryCode = req.body.countryCode;
   var cost = req.body.cost;
 
-  var user = db.prepare('SELECT balance FROM users WHERE email = ?').get(email);
+  var user = await db.prepare('SELECT balance FROM users WHERE email = $1').get(email);
   if (!user) return res.status(404).json({ error: 'User not found' });
   if (user.balance < cost) return res.status(400).json({ error: 'Insufficient balance' });
 
@@ -262,21 +235,11 @@ const newNumber = {
   if (useRealProvider) {
     try {
       var provider = require('./sms-provider');
-      
-      // Pass both ID and Name for exact matching
       var serviceCode = provider.getServiceCode(serviceName, serviceId);
-      
-      // STOP if service not found in dynamic list
-      if (!serviceCode) {
-        return res.status(400).json({ error: 'This service is currently not supported by our provider.' });
-      }
+      if (!serviceCode) return res.status(400).json({ error: 'This service is currently not supported by our provider.' });
 
       var countryCodeForProvider = provider.getCountryCode(countryCode);
-      
-      // STOP if country not found in dynamic list
-      if (!countryCodeForProvider) {
-        return res.status(400).json({ error: 'This country is currently not supported by our provider.' });
-      }
+      if (!countryCodeForProvider) return res.status(400).json({ error: 'This country is currently not supported by our provider.' });
 
       var result = await provider.getNumber(serviceCode, countryCodeForProvider);
       if (!result.success) return res.status(400).json({ error: result.error || 'No numbers available. Try a different country.' });
@@ -292,17 +255,20 @@ const newNumber = {
     realPhone = generatePhone(country.prefix);
   }
 
-  db.prepare('UPDATE users SET balance = balance - ? WHERE email = ?').run(cost, email);
-  var insertResult = db.prepare('INSERT INTO numbers (email, service_name, service_id, phone, status, time_left, total_time, cost, provider_request_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(email, serviceName, serviceId, realPhone, 'waiting', 600, 600, cost, providerRequestId);
+  await db.prepare('UPDATE users SET balance = balance - $1 WHERE email = $2').run(cost, email);
+  
+  // Using RETURNING id to get the new database ID for Postgres
+  var insertResult = await db.prepare('INSERT INTO numbers (email, service_name, service_id, phone, status, time_left, total_time, cost, provider_request_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id').run(email, serviceName, serviceId, realPhone, 'waiting', 600, 600, cost, providerRequestId);
+  
+  var numberId = insertResult.rows[0].id;
 
-  // Add to history so users can see their purchase immediately
-  db.prepare('INSERT INTO history (email, service_name, phone, code, status, cost) VALUES (?, ?, ?, ?, ?, ?)').run(email, serviceName, realPhone, null, 'pending', cost);
+  await db.prepare('INSERT INTO history (email, service_name, phone, code, status, cost) VALUES ($1, $2, $3, NULL, $4, $5)').run(email, serviceName, realPhone, 'pending', cost);
 
   if (useRealProvider && providerRequestId) {
-    startPolling(insertResult.lastInsertRowid, providerRequestId, serviceName);
+    startPolling(numberId, providerRequestId, serviceName);
   }
 
-  res.json({ id: insertResult.lastInsertRowid, phone: realPhone, status: 'waiting', timeLeft: 600, totalTime: 600, cost: cost, balance: user.balance - cost });
+  res.json({ id: numberId, phone: realPhone, status: 'waiting', timeLeft: 600, totalTime: 600, cost: cost, balance: user.balance - cost });
 });
 
 function startPolling(numberId, providerRequestId, serviceName) {
@@ -320,8 +286,8 @@ function startPolling(numberId, providerRequestId, serviceName) {
       if (result.success && result.code) {
         clearInterval(interval);
         var smsText = 'Your ' + serviceName + ' verification code is ' + result.code + '. Do not share it with anyone.';
-        db.prepare('UPDATE numbers SET status = ?, code = ?, sms_text = ? WHERE id = ?').run('received', result.code, smsText, numberId);
-        db.prepare('INSERT INTO history (email, service_name, phone, code, status, cost) SELECT email, service_name, phone, ?, ?, cost FROM numbers WHERE id = ?').run(result.code, 'success', numberId);
+        await db.prepare('UPDATE numbers SET status = $1, code = $2, sms_text = $3 WHERE id = $4').run('received', result.code, smsText, numberId);
+        await db.prepare('INSERT INTO history (email, service_name, phone, code, status, cost) SELECT email, service_name, phone, $1, $2, cost FROM numbers WHERE id = $3').run(result.code, 'success', numberId);
         provider.complete(providerRequestId).catch(function() {});
       }
       if (result.success === false && result.waiting === false) {
@@ -339,57 +305,67 @@ function startPolling(numberId, providerRequestId, serviceName) {
 }
 
 app.delete('/api/numbers/:id', async function(req, res) {
-  var num = db.prepare('SELECT * FROM numbers WHERE id = ?').get(req.params.id);
+  var num = await db.prepare('SELECT * FROM numbers WHERE id = $1').get(req.params.id);
   if (!num) return res.status(404).json({ error: 'Number not found' });
   if (num.status !== 'waiting') return res.status(400).json({ error: 'Can only cancel waiting numbers' });
+  
   if (num.provider_request_id) {
     try { var provider = require('./sms-provider'); await provider.cancel(num.provider_request_id); } catch (err) { console.error('Cancel error:', err.message); }
   }
-  db.prepare('UPDATE users SET balance = balance + ? WHERE email = ?').run(num.cost, num.email);
-  db.prepare('DELETE FROM numbers WHERE id = ?').run(req.params.id);
-  var user = db.prepare('SELECT balance FROM users WHERE email = ?').get(num.email);
+  
+  await db.prepare('UPDATE users SET balance = balance + $1 WHERE email = $2').run(num.cost, num.email);
+  await db.prepare('DELETE FROM numbers WHERE id = $1').run(req.params.id);
+  
+  var user = await db.prepare('SELECT balance FROM users WHERE email = $1').get(num.email);
   res.json({ message: 'Cancelled and refunded', balance: user.balance });
 });
 
-app.post('/api/numbers/:id/expire', function(req, res) {
-  var num = db.prepare('SELECT * FROM numbers WHERE id = ?').get(req.params.id);
+app.post('/api/numbers/:id/expire', async function(req, res) {
+  var num = await db.prepare('SELECT * FROM numbers WHERE id = $1').get(req.params.id);
   if (!num) return res.status(404).json({ error: 'Number not found' });
-  db.prepare('UPDATE users SET balance = balance + ? WHERE email = ?').run(num.cost, num.email);
-  db.prepare('UPDATE numbers SET status = ?, time_left = 0 WHERE id = ?').run('expired', req.params.id);
-  db.prepare('INSERT INTO history (email, service_name, phone, code, status, cost) VALUES (?, ?, ?, NULL, ?, ?)').run(num.email, num.service_name, num.phone, 'failed', num.cost);
-  var user = db.prepare('SELECT balance FROM users WHERE email = ?').get(num.email);
+  
+  await db.prepare('UPDATE users SET balance = balance + $1 WHERE email = $2').run(num.cost, num.email);
+  await db.prepare('UPDATE numbers SET status = $1, time_left = 0 WHERE id = $2').run('expired', req.params.id);
+  await db.prepare('INSERT INTO history (email, service_name, phone, code, status, cost) VALUES ($1, $2, $3, NULL, $4, $5)').run(num.email, num.service_name, num.phone, 'failed', num.cost);
+  
+  var user = await db.prepare('SELECT balance FROM users WHERE email = $1').get(num.email);
   res.json({ balance: user.balance });
 });
 
-app.post('/api/numbers/:id/receive', function(req, res) {
+app.post('/api/numbers/:id/receive', async function(req, res) {
   var code = req.body.code;
   var smsText = req.body.smsText;
-  var num = db.prepare('SELECT * FROM numbers WHERE id = ? AND status = ?').get(req.params.id, 'waiting');
+  var num = await db.prepare('SELECT * FROM numbers WHERE id = $1 AND status = $2').get(req.params.id, 'waiting');
   if (!num) return res.status(404).json({ error: 'Number not found or not waiting' });
-  db.prepare('UPDATE numbers SET status = ?, code = ?, sms_text = ? WHERE id = ?').run('received', code, smsText, req.params.id);
-  db.prepare('INSERT INTO history (email, service_name, phone, code, status, cost) VALUES (?, ?, ?, ?, ?, ?)').run(num.email, num.service_name, num.phone, code, 'success', num.cost);
+  
+  await db.prepare('UPDATE numbers SET status = $1, code = $2, sms_text = $3 WHERE id = $4').run('received', code, smsText, req.params.id);
+  await db.prepare('INSERT INTO history (email, service_name, phone, code, status, cost) VALUES ($1, $2, $3, $4, $5, $6)').run(num.email, num.service_name, num.phone, code, 'success', num.cost);
+  
   res.json({ message: 'Code received', code: code });
 });
 
 // ====== HISTORY ======
-app.get('/api/history/:email', function(req, res) {
-  var rows = db.prepare('SELECT * FROM history WHERE email = ? ORDER BY created_at DESC').all(req.params.email);
+app.get('/api/history/:email', async function(req, res) {
+  var rows = await db.prepare('SELECT * FROM history WHERE email = $1 ORDER BY created_at DESC').all(req.params.email);
   res.json(rows);
 });
 
-app.post('/api/simulate/:id', function(req, res) {
-  var num = db.prepare('SELECT * FROM numbers WHERE id = ? AND status = ?').get(req.params.id, 'waiting');
+app.post('/api/simulate/:id', async function(req, res) {
+  var num = await db.prepare('SELECT * FROM numbers WHERE id = $1 AND status = $2').get(req.params.id, 'waiting');
   if (!num) return res.json({ message: 'No waiting number found' });
+  
   var code = String(Math.floor(100000 + Math.random() * 900000));
   var smsText = 'Your ' + num.service_name + ' verification code is ' + code + '. Do not share it with anyone.';
-  db.prepare('UPDATE numbers SET status = ?, code = ?, sms_text = ? WHERE id = ?').run('received', code, smsText, num.id);
-  db.prepare('INSERT INTO history (email, service_name, phone, code, status, cost) VALUES (?, ?, ?, ?, ?, ?)').run(num.email, num.service_name, num.phone, code, 'success', num.cost);
+  
+  await db.prepare('UPDATE numbers SET status = $1, code = $2, sms_text = $3 WHERE id = $4').run('received', code, smsText, num.id);
+  await db.prepare('INSERT INTO history (email, service_name, phone, code, status, cost) VALUES ($1, $2, $3, $4, $5, $6)').run(num.email, num.service_name, num.phone, code, 'success', num.cost);
+  
   res.json({ message: 'Simulated SMS received', code: code, phone: num.phone, service: num.service_name });
 });
 
 // ====== DEPOSITS HISTORY ======
-app.get('/api/deposits/:email', function(req, res) {
-  var rows = db.prepare('SELECT * FROM deposits WHERE email = ? ORDER BY created_at DESC').all(req.params.email);
+app.get('/api/deposits/:email', async function(req, res) {
+  var rows = await db.prepare('SELECT * FROM deposits WHERE email = $1 ORDER BY created_at DESC').all(req.params.email);
   res.json(rows);
 });
 
@@ -405,27 +381,20 @@ async function loadProviderMaps() {
   try {
     var provider = require('./sms-provider');
     
-    // Fetch Countries
     var cRes = await fetch('https://sms-bus.com/api/control/list/countries?token=' + process.env.SMS_API_KEY);
     var cData = await cRes.json();
     var countryMap = {};
     if (cData.code === 200 && cData.data) {
-      Object.values(cData.data).forEach(function(c) {
-        countryMap[c.code.toLowerCase()] = String(c.id); // e.g. "gb" -> "25"
-      });
+      Object.values(cData.data).forEach(function(c) { countryMap[c.code.toLowerCase()] = String(c.id); });
     }
 
-    // Fetch Services
     var pRes = await fetch('https://sms-bus.com/api/control/list/projects?token=' + process.env.SMS_API_KEY);
     var pData = await pRes.json();
     var serviceMap = {};
     if (pData.code === 200 && pData.data) {
-      Object.values(pData.data).forEach(function(p) {
-        serviceMap[p.code.toLowerCase()] = String(p.id); // e.g. "tk" -> "3"
-      });
+      Object.values(pData.data).forEach(function(p) { serviceMap[p.code.toLowerCase()] = String(p.id); });
     }
 
-    // Send the maps to sms-provider.js
     provider.setMaps(serviceMap, countryMap);
   } catch (err) {
     console.error('Failed to auto-load provider maps. Error:', err.message);
@@ -440,7 +409,6 @@ var server = app.listen(PORT, function() {
   console.log('Server started on port ' + PORT);
 });
 
-// Fix Railway proxy crashing the server
 server.on('clientError', function(err, socket) {
   if (err.code === 'HPE_INVALID_CONSTANT') return socket.destroy();
   socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');

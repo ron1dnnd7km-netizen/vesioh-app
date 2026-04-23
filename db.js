@@ -1,75 +1,84 @@
-const Database = require('better-sqlite3');
-const db = new Database('smsvirtual.db');
+const { Pool } = require('pg');
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    email TEXT PRIMARY KEY,
-    name TEXT DEFAULT '',
-    password TEXT DEFAULT '',
-    balance REAL DEFAULT 6.00
-  );
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
-  CREATE TABLE IF NOT EXISTS  provider_request_id (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT NOT NULL,
-    service_name TEXT NOT NULL,
-    service_id TEXT NOT NULL,
-    phone TEXT NOT NULL,
-    status TEXT DEFAULT 'waiting',
-    time_left INTEGER DEFAULT 1200,
-    total_time INTEGER DEFAULT 1200,
-    cost REAL NOT NULL,
-    code TEXT,
-    sms_text TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+async function initDB() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      email TEXT PRIMARY KEY,
+      password TEXT NOT NULL,
+      balance REAL DEFAULT 0,
+      referral_code TEXT UNIQUE,
+      referred_by TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
 
     CREATE TABLE IF NOT EXISTS numbers (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT NOT NULL,
-    service_name TEXT NOT NULL,
-    service_id TEXT NOT NULL,
-    phone TEXT NOT NULL,
-    status TEXT DEFAULT 'waiting',
-    time_left INTEGER DEFAULT 1200,
-    total_time INTEGER DEFAULT 1200,
-    cost REAL NOT NULL,
-    code TEXT,
-    sms_text TEXT,
-    provider_request_id TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+      id SERIAL PRIMARY KEY,
+      email TEXT NOT NULL,
+      service_name TEXT,
+      service_id TEXT,
+      phone TEXT NOT NULL,
+      status TEXT DEFAULT 'waiting',
+      code TEXT,
+      sms_text TEXT,
+      time_left INTEGER DEFAULT 600,
+      total_time INTEGER DEFAULT 600,
+      cost REAL,
+      provider_request_id TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
 
-  CREATE TABLE IF NOT EXISTS history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT NOT NULL,
-    service_name TEXT NOT NULL,
-    phone TEXT NOT NULL,
-    code TEXT,
-    status TEXT DEFAULT 'success',
-    cost REAL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-`);
+    CREATE TABLE IF NOT EXISTS history (
+      id SERIAL PRIMARY KEY,
+      email TEXT NOT NULL,
+      service_name TEXT,
+      phone TEXT,
+      code TEXT,
+      status TEXT,
+      cost REAL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
 
-// Add name/password columns if they don't exist (for existing databases)
-try { db.exec('ALTER TABLE users ADD COLUMN name TEXT DEFAULT ""'); } catch(e) {}
-try { db.exec('ALTER TABLE users ADD COLUMN password TEXT DEFAULT ""'); } catch(e) {}
-try { db.exec('ALTER TABLE users ADD COLUMN ref_code TEXT'); } catch(e) {}
-try { db.exec('ALTER TABLE users ADD COLUMN referred_by TEXT'); } catch(e) {}
-try { db.exec('ALTER TABLE numbers ADD COLUMN provider_request_id TEXT'); } catch(e) {}
+    CREATE TABLE IF NOT EXISTS deposits (
+      id SERIAL PRIMARY KEY,
+      email TEXT NOT NULL,
+      amount REAL NOT NULL,
+      method TEXT,
+      status TEXT DEFAULT 'pending',
+      reference TEXT UNIQUE,
+      pay_currency TEXT,
+      tx_id TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS deposits (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT NOT NULL,
-    amount REAL NOT NULL,
-    method TEXT NOT NULL,
-    status TEXT DEFAULT 'pending',
-    reference TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-`);
-try { db.exec('ALTER TABLE deposits ADD COLUMN reference TEXT'); } catch(e) {}
-try { db.exec('ALTER TABLE deposits ADD COLUMN pay_currency TEXT'); } catch(e) {}
-module.exports = db;
+    CREATE TABLE IF NOT EXISTS provider_request_id (
+      id SERIAL PRIMARY KEY,
+      number_id INTEGER,
+      provider_id TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  console.log('✅ PostgreSQL tables ready');
+}
+
+initDB().catch(err => console.error('DB Init Error:', err));
+
+module.exports = {
+  prepare: function(sql) {
+    return {
+      run: async function(...params) { return await pool.query(sql, params); },
+      get: async function(...params) { 
+        const res = await pool.query(sql, params); 
+        return res.rows[0]; 
+      },
+      all: async function(...params) { 
+        const res = await pool.query(sql, params); 
+        return res.rows; 
+      }
+    };
+  }
+};

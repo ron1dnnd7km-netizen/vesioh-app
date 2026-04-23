@@ -4,73 +4,55 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SMS Virtual Code</title>
-  
   <link rel="preconnect" href="https://cdnjs.cloudflare.com">
   <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
-  
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💬</text></svg>">
-  
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <!-- AUTH PAGES: Landing, Login, Signup render here -->
   <div id="authPages"></div>
 
-  <!-- APP PAGES: Dashboard renders here (hidden until login) -->
   <div id="appPages" style="display:none;">
-
-    <!-- ===== TOP NAV ===== -->
     <nav class="top-nav">
       <div class="nav-left">
-        <!-- Centered logo: shown ONLY on mobile via CSS -->
-        <div class="nav-center-logo" style="display:none;">
+        <!-- Mobile Logo - data-notranslate added -->
+        <div class="nav-center-logo" style="display:none;" data-notranslate>
           <div class="logo-icon"><i class="fas fa-comment-dots"></i></div>
           SMS Virtual <span>Code</span>
         </div>
-
-        <!-- Desktop logo: hidden on mobile via CSS -->
-        <div class="logo">
+        <!-- Desktop Logo - data-notranslate added -->
+        <div class="logo" data-notranslate>
           <div class="logo-icon"><i class="fas fa-comment-dots"></i></div>
           SMS Virtual <span>Code</span>
         </div>
-
         <div class="nav-links">
-          <button type="button" class="nav-link active" data-page="numbers">Home</button>
-          <button type="button" class="nav-link" data-page="history">History</button>
-          <button type="button" class="nav-link" data-page="help">Help</button>
-          <button type="button" class="nav-link" data-page="contacts">Contacts</button>
+          <button type="button" class="nav-link active" data-page="numbers" data-i18n="Home">Home</button>
+          <button type="button" class="nav-link" data-page="history" data-i18n="History">History</button>
+          <button type="button" class="nav-link" data-page="help" data-i18n="Help">Help</button>
+          <button type="button" class="nav-link" data-page="contacts" data-i18n="Contacts">Contacts</button>
           <button type="button" class="nav-link" data-page="deposit" style="color:var(--accent);">
-            <i class="fas fa-plus" style="font-size:10px;margin-right:4px;"></i> Add Funds
+            <i class="fas fa-plus" style="font-size:10px;margin-right:4px;"></i><span data-i18n="Add Funds">Add Funds</span>
           </button>
         </div>
       </div>
-
       <div class="nav-right">
-        <!-- Balance first -->
-        <div class="balance-badge" id="balanceBadge" style="cursor:pointer;" onclick="navigateTo('deposit')" role="button" tabindex="0" aria-label="Go to deposit page">
+        <div class="balance-badge" id="balanceBadge" style="cursor:pointer;" onclick="navigateTo('deposit')" role="button" tabindex="0">
           <i class="fas fa-wallet"></i>
           <span id="balanceAmount">$0.00</span>
         </div>
-
-        <!-- Notification after balance -->
-        <button type="button" class="notification-btn" aria-label="Notifications">
-          <i class="fas fa-bell"></i>
-          <span class="dot"></span>
-        </button>
-
+        <button type="button" class="notification-btn"><i class="fas fa-bell"></i><span class="dot"></span></button>
         <div class="language-menu">
-          <button type="button" class="language-btn" id="desktopLangBtn" aria-label="Language">
+          <button type="button" class="language-btn" id="desktopLangBtn">
             <span class="language-flag" id="desktopLangFlag">🇬🇧</span>
             <i class="fas fa-chevron-down" style="font-size:10px;margin-left:2px;"></i>
           </button>
           <div class="language-dropdown" id="desktopLangDrop">
-            <button type="button" onclick="changeLanguage('en')"><span>🇬🇧</span> English</button>
-            <button type="button" onclick="changeLanguage('zh')"><span>🇨🇳</span> 中国人</button>
-            <button type="button" onclick="changeLanguage('ru')"><span>🇷🇺</span> 俄语</button>
+            <button type="button" onclick="changeLanguage('en')"><span>🇬🇧</span> <span data-i18n="English">English</span></button>
+            <button type="button" onclick="changeLanguage('zh')"><span>🇨🇳</span> <span data-i18n="Chinese">中文</span></button>
+            <button type="button" onclick="changeLanguage('ru')"><span>🇷🇺</span> <span data-i18n="Russian">Русский</span></button>
           </div>
         </div>
-
         <div class="user-menu">
           <div class="user-info">
             <div class="user-avatar" id="userAvatarDisplay">AS</div>
@@ -78,156 +60,113 @@
             <i class="fas fa-chevron-down"></i>
           </div>
           <div class="user-dropdown">
-            <button type="button" onclick="navigateTo('settings')"><i class="fas fa-cog"></i> Settings</button>
+            <button type="button" onclick="navigateTo('settings')"><i class="fas fa-cog"></i> <span data-i18n="Settings">Settings</span></button>
             <div class="divider"></div>
-            <button type="button" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
-            <button type="button" onclick="deleteAccount()"><i class="fas fa-trash"></i> Delete Account</button>
+            <button type="button" onclick="logout()"><i class="fas fa-sign-out-alt"></i> <span data-i18n="Logout">Logout</span></button>
+            <button type="button" onclick="deleteAccount()"><i class="fas fa-trash"></i> <span data-i18n="Delete Account">Delete Account</span></button>
           </div>
         </div>
-
-        <!-- Hamburger: shown ONLY on mobile -->
-        <button type="button" class="hamburger" id="hamburger" aria-label="Toggle menu">
-          <i class="fas fa-bars"></i>
-        </button>
+        <button type="button" class="hamburger" id="hamburger"><i class="fas fa-bars"></i></button>
       </div>
     </nav>
 
-    <!-- ===== MAIN LAYOUT ===== -->
     <div class="main-layout">
       <aside class="sidebar" id="sidebar">
-
-        <!-- ========== MOBILE DROPDOWN MENU (hidden on desktop via CSS) ========== -->
         <div class="mobile-dropdown-content">
           <ul class="mobile-menu-list">
-            <!-- Main Navigation -->
-            <li class="menu-section-title">Menu</li>
-            <li><button type="button" class="menu-nav-btn" data-page="numbers" onclick="handleNav('numbers')"><i class="fas fa-home"></i> Home</button></li>
-            <li><button type="button" class="menu-nav-btn" data-page="deposit" onclick="handleNav('deposit')"><i class="fas fa-wallet"></i> Add Funds</button></li>
-            <li><button type="button" class="menu-nav-btn" data-page="history" onclick="handleNav('history')"><i class="fas fa-clock-rotate-left"></i> History</button></li>
-            <li><button type="button" class="menu-nav-btn" data-page="settings" onclick="handleNav('settings')"><i class="fas fa-gift"></i> Referral Program</button></li>
-            <li><button type="button" class="menu-nav-btn" data-page="help" onclick="handleNav('help')"><i class="fas fa-circle-question"></i> Help Center</button></li>
-            <li><button type="button" class="menu-nav-btn" data-page="contacts" onclick="handleNav('contacts')"><i class="fas fa-envelope"></i> Contacts</button></li>
-            
+            <li class="menu-section-title" data-i18n="Menu">Menu</li>
+            <li><button type="button" class="menu-nav-btn" data-page="numbers" onclick="handleNav('numbers')"><i class="fas fa-home"></i> <span data-i18n="Home">Home</span></button></li>
+            <li><button type="button" class="menu-nav-btn" data-page="deposit" onclick="handleNav('deposit')"><i class="fas fa-wallet"></i> <span data-i18n="Add Funds">Add Funds</span></button></li>
+            <li><button type="button" class="menu-nav-btn" data-page="history" onclick="handleNav('history')"><i class="fas fa-clock-rotate-left"></i> <span data-i18n="History">History</span></button></li>
+            <li><button type="button" class="menu-nav-btn" data-page="settings" onclick="handleNav('settings')"><i class="fas fa-gift"></i> <span data-i18n="Referral Program">Referral Program</span></button></li>
+            <li><button type="button" class="menu-nav-btn" data-page="help" onclick="handleNav('help')"><i class="fas fa-circle-question"></i> <span data-i18n="Help Center">Help Center</span></button></li>
+            <li><button type="button" class="menu-nav-btn" data-page="contacts" onclick="handleNav('contacts')"><i class="fas fa-envelope"></i> <span data-i18n="Contacts">Contacts</span></button></li>
             <li class="menu-divider"></li>
-            
-            <!-- Language Section -->
-            <li class="menu-section-title">Settings</li>
+            <li class="menu-section-title" data-i18n="Settings">Settings</li>
             <li class="language-item">
               <button type="button" class="menu-lang-btn" id="mobileLangBtn" onclick="toggleMobileLang()">
                 <span class="language-flag" id="mobileLangFlag" style="font-size:20px;">🇬🇧</span>
-                <span>Language</span>
+                <span data-i18n="Language">Language</span>
                 <i class="fas fa-chevron-down language-chevron"></i>
               </button>
               <div class="language-submenu" id="mobileLangDrop">
-                <button type="button" onclick="changeLanguage('en')"><span>🇬🇧</span> English</button>
-                <button type="button" onclick="changeLanguage('zh')"><span>🇨🇳</span> 中国人</button>
-                <button type="button" onclick="changeLanguage('ru')"><span>🇷🇺</span> 俄语</button>
+                <button type="button" onclick="changeLanguage('en')"><span>🇬🇧</span> <span data-i18n="English">English</span></button>
+                <button type="button" onclick="changeLanguage('zh')"><span>🇨🇳</span> <span data-i18n="Chinese">中文</span></button>
+                <button type="button" onclick="changeLanguage('ru')"><span>🇷🇺</span> <span data-i18n="Russian">Русский</span></button>
               </div>
             </li>
-            
             <li class="menu-divider"></li>
-            
-            <!-- Account Section -->
             <li class="email-item" id="mobileEmail">user@email.com</li>
-            <li><button type="button" onclick="handleLogout()" class="logout-btn"><i class="fas fa-right-from-bracket"></i> Logout</button></li>
-            <li><button type="button" onclick="handleDeleteAccount()" class="delete-btn"><i class="fas fa-trash-can"></i> Delete Account</button></li>
+            <li><button type="button" onclick="handleLogout()" class="logout-btn"><i class="fas fa-right-from-bracket"></i> <span data-i18n="Logout">Logout</span></button></li>
+            <li><button type="button" onclick="handleDeleteAccount()" class="delete-btn"><i class="fas fa-trash-can"></i> <span data-i18n="Delete Account">Delete Account</span></button></li>
           </ul>
         </div>
-        <!-- ========== END MOBILE DROPDOWN MENU ========== -->
-
-        <!-- ========== DESKTOP SIDEBAR (hidden on mobile via CSS) ========== -->
         <div class="search-box">
           <div class="search-input-wrap">
             <i class="fas fa-search"></i>
-            <input type="text" class="search-input" placeholder="Search services..." id="serviceSearch" aria-label="Search services">
+            <input type="text" class="search-input" id="serviceSearch" data-i18n-placeholder="Search services..." placeholder="Search services...">
           </div>
         </div>
         <div class="sidebar-section">
-          <div class="sidebar-title">Recommended</div>
+          <div class="sidebar-title" data-i18n="Recommended">Recommended</div>
           <div id="recommendedList"></div>
         </div>
         <div class="sidebar-section">
-          <div class="sidebar-title">Popular Services</div>
+          <div class="sidebar-title" data-i18n="Popular Services">Popular Services</div>
           <div id="popularList"></div>
         </div>
         <div class="sidebar-section">
-          <div class="sidebar-title">Social Media</div>
+          <div class="sidebar-title" data-i18n="Social Media">Social Media</div>
           <div id="socialList"></div>
         </div>
         <div class="sidebar-section">
-          <div class="sidebar-title">E-Commerce</div>
+          <div class="sidebar-title" data-i18n="E-Commerce">E-Commerce</div>
           <div id="ecommerceList"></div>
         </div>
-        <!-- ========== END DESKTOP SIDEBAR ========== -->
-
       </aside>
-      
       <main class="main-content" id="mainContent"></main>
     </div>
   </div>
 
-  <!-- Sidebar Overlay (outside main-layout) -->
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-  <!-- Modal -->
   <div class="modal-overlay" id="modalOverlay">
     <div class="modal" role="dialog" aria-modal="true">
       <div class="modal-header">
-        <h3 class="modal-title">Get Virtual Number</h3>
-        <button type="button" class="modal-close" id="modalClose" aria-label="Close"><i class="fas fa-times"></i></button>
+        <h3 class="modal-title" data-i18n="Get Virtual Number">Get Virtual Number</h3>
+        <button type="button" class="modal-close" id="modalClose"><i class="fas fa-times"></i></button>
       </div>
       <div class="modal-body">
         <div class="form-group">
-          <label class="form-label" for="modalService">Service</label>
-          <select class="form-select" id="modalService"><option value="">Select a service...</option></select>
+          <label class="form-label" for="modalService" data-i18n="Service">Service</label>
+          <select class="form-select" id="modalService"><option value="" data-i18n="Select a service...">Select a service...</option></select>
           <div class="custom-service-input" id="customServiceInput" style="display:none;margin-top:12px;">
-            <input type="text" class="form-input" id="customServiceName" placeholder="Enter service name (e.g., MyApp, CustomService)" maxlength="50">
+            <input type="text" class="form-input" id="customServiceName" data-i18n-placeholder="Enter service name (e.g., MyApp, CustomService)" placeholder="Enter service name (e.g., MyApp, CustomService)" maxlength="50">
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label" for="modalCountry">Country / Region</label>
-          <select class="form-select" id="modalCountry"><option value="">Select country...</option></select>
+          <label class="form-label" for="modalCountry" data-i18n="Country / Region">Country / Region</label>
+          <select class="form-select" id="modalCountry"><option value="" data-i18n="Select country...">Select country...</option></select>
         </div>
         <div class="form-group" id="paymentMethodGroup" style="display:none;">
-          <label class="form-label">Payment Method</label>
+          <label class="form-label" data-i18n="Payment Method">Payment Method</label>
           <div style="display:flex;flex-direction:column;gap:8px;">
-            <label class="payment-option">
-              <input type="radio" name="paymentMethod" value="usdt" checked>
-              <div>
-                <div style="font-size:13px;font-weight:600;">USDT</div>
-                <div style="font-size:11px;color:var(--text-muted);">Tether - Lowest fees</div>
-              </div>
-            </label>
-            <label class="payment-option">
-              <input type="radio" name="paymentMethod" value="btc">
-              <div>
-                <div style="font-size:13px;font-weight:600;">Bitcoin</div>
-                <div style="font-size:11px;color:var(--text-muted);">BTC</div>
-              </div>
-            </label>
-            <label class="payment-option">
-              <input type="radio" name="paymentMethod" value="eth">
-              <div>
-                <div style="font-size:13px;font-weight:600;">Ethereum</div>
-                <div style="font-size:11px;color:var(--text-muted);">ETH</div>
-              </div>
-            </label>
+            <label class="payment-option"><input type="radio" name="paymentMethod" value="usdt" checked><div><div style="font-size:13px;font-weight:600;">USDT</div><div style="font-size:11px;color:var(--text-muted);" data-i18n="Tether - Lowest fees">Tether - Lowest fees</div></div></label>
+            <label class="payment-option"><input type="radio" name="paymentMethod" value="btc"><div><div style="font-size:13px;font-weight:600;">Bitcoin</div><div style="font-size:11px;color:var(--text-muted);">BTC</div></div></label>
+            <label class="payment-option"><input type="radio" name="paymentMethod" value="eth"><div><div style="font-size:13px;font-weight:600;">Ethereum</div><div style="font-size:11px;color:var(--text-muted);">ETH</div></div></label>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <!-- Scripts: order matters -->
   <script src="js/data.js"></script>
   <script src="js/sidebar.js"></script>
   <script src="js/modal.js"></script>
   <script src="js/pages.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/app.js"></script>
-
 </body>
 </html>
