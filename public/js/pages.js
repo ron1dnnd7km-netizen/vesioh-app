@@ -1349,7 +1349,6 @@ async function processDeposit() {
     var endpoint, payload, redirectField;
 
     if (selectedPaymentMethod === 'stripe') {
-      // ========== FLUTTERWAVE (Bank / Card) ==========
       endpoint = '/api/deposit/flutterwave';
       payload = {
         email: getUserEmail(),
@@ -1358,7 +1357,6 @@ async function processDeposit() {
       redirectField = 'payment_link';
 
     } else if (selectedPaymentMethod === 'usdt') {
-      // ========== PLISIO — USDT TRC-20 ==========
       endpoint = '/api/deposit/plisio';
       payload = {
         email: getUserEmail(),
@@ -1368,7 +1366,6 @@ async function processDeposit() {
       redirectField = 'invoice_url';
 
     } else {
-      // ========== PLISIO — User-picked crypto ==========
       endpoint = '/api/deposit/plisio';
       payload = {
         email: getUserEmail(),
@@ -1378,6 +1375,9 @@ async function processDeposit() {
       redirectField = 'invoice_url';
     }
 
+    // Show loading overlay while waiting for API response
+    showDepositLoadingOverlay();
+
     var res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1386,18 +1386,41 @@ async function processDeposit() {
     var data = await res.json();
 
     if (data.error) {
+      hideDepositLoadingOverlay();
       showToast(data.error, 'error');
     } else if (data[redirectField]) {
       window.location.href = data[redirectField];
     } else {
+      hideDepositLoadingOverlay();
       showToast('Unexpected response from payment provider', 'error');
     }
   } catch (err) {
+    hideDepositLoadingOverlay();
     showToast('Error: ' + err.message, 'error');
   }
 
   updatePayButton();
   btn.disabled = false;
+}
+
+// ===== ADD THESE TWO FUNCTIONS BELOW processDeposit =====
+
+function showDepositLoadingOverlay() {
+  hideDepositLoadingOverlay(); // Remove old ones first
+  var overlay = document.createElement('div');
+  overlay.id = 'depositLoadingOverlay';
+  overlay.style.css = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = '<div style="background:var(--bg-card);padding:40px 50px;border-radius:20px;text-align:center;max-width:340px;box-shadow:0 20px 60px rgba(0,0,0,0.3);">' +
+    '<div style="width:60px;height:60px;border:4px solid var(--accent);border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 20px;"></div>' +
+    '<h3 style="color:var(--text-primary);font-size:18px;margin:0 0 10px 0;">Redirecting to Payment...</h3>' +
+    '<p style="color:var(--text-secondary);font-size:14px;margin:0;">Please wait, do not close this page.</p>' +
+  '</div>';
+  document.body.appendChild(overlay);
+}
+
+function hideDepositLoadingOverlay() {
+  var overlay = document.getElementById('depositLoadingOverlay');
+  if (overlay) overlay.remove();
 }
 
 async function loadDepositHistory() {
