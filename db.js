@@ -55,6 +55,16 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS withdrawals (
+      id SERIAL PRIMARY KEY,
+      email TEXT NOT NULL,
+      method TEXT NOT NULL,
+      address TEXT NOT NULL,
+      amount REAL NOT NULL DEFAULT 0,
+      status TEXT DEFAULT 'pending',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS provider_request_id (
       id SERIAL PRIMARY KEY,
       number_id INTEGER,

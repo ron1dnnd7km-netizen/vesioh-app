@@ -1,5 +1,5 @@
 /* v2 - Ultra Complete Translation */
-if (!window.currentPage) window.currentPage = 'numbers';
+ window.currentPage = getPageFromHash() || 'numbers';
 if (!window.activeNumbers) window.activeNumbers = [];
 if (!window.historyData) window.historyData = [];
 if (!window.currentFilter) window.currentFilter = 'all';
@@ -147,7 +147,7 @@ function checkForPendingDeposits() { if (window.depositHistoryData && window.dep
 function startDepositPolling() { if (depositPollingInterval) clearInterval(depositPollingInterval); var attempts = 0; depositPollingInterval = setInterval(function() { attempts++; Promise.all([loadBalance(), loadDepositHistory()]).then(function() { if (window.depositHistoryData && window.depositHistoryData.length > 0) { var l = window.depositHistoryData[0]; if (l.status==='completed') { showToast(t('Payment successful! Balance updated.'), 'success'); stopDepositPolling(); if (window.currentPage==='deposit') renderMainContent(); return; } if (l.status==='failed'||l.status==='cancelled') { showToast(t('Payment failed or cancelled.'), 'error'); stopDepositPolling(); if (window.currentPage==='deposit') renderMainContent(); return; } } if (attempts >= 24) { stopDepositPolling(); showToast(t('Payment is still processing. It will update automatically.'), 'info'); } }); }, 5000); }
 function stopDepositPolling() { if (depositPollingInterval) { clearInterval(depositPollingInterval); depositPollingInterval = null; } }
 
-window.handleLogout = function() { closeMobileSidebar(); showToast(t('Logging out...'), 'info'); if (typeof logout === 'function') logout(); };
+window.handleLogout = function() { closeMobileSidebar(); if (typeof logout === 'function') logout(); };
 window.handleDeleteAccount = function() { closeMobileSidebar(); deleteAccount(); };
 function deleteAccount() { if (confirm(t('Are you sure you want to delete your account? This action cannot be undone.'))) showToast(t('Account deletion not implemented yet'), 'error'); }
 
@@ -269,7 +269,7 @@ var translations = {
     'Contact Us':'Contact Us','Get in Touch':'Get in Touch',
     'Send Message':'Send Message',
     'Subject':'Subject','Your message':'Your message',
-    'Name':'Name','Email':'Email','Telephone':'Telephone',
+    'Name':'Name','Email':'Email','Telegram Support':'Telegram Support',
     'Message sent successfully':'Message sent successfully',
     'Error sending message':'Error sending message',
     'Type your message...':'Type your message...',
@@ -953,4 +953,61 @@ async function bootSequence() {
     showApp = async function() { await orig(); await loadBalance(); await loadNumbers(); window.currentPage = getPageFromHash(); await preLoadPageData(window.currentPage); renderMainContent(); };
   }
   if (typeof checkSession === 'function') checkSession();
+  initTheme();
+}
+
+function initTheme() {
+  var isDark = localStorage.getItem('darkMode') === 'true';
+  if (isDark) applyDarkMode();
+  updateThemeButton();
+}
+
+function toggleTheme() {
+  var isDark = localStorage.getItem('darkMode') === 'true';
+  if (isDark) {
+    localStorage.setItem('darkMode', 'false');
+    removeDarkMode();
+  } else {
+    localStorage.setItem('darkMode', 'true');
+    applyDarkMode();
+  }
+  updateThemeButton();
+}
+
+function applyDarkMode() {
+  document.documentElement.setAttribute('data-theme', 'dark');
+}
+
+function removeDarkMode() {
+  document.documentElement.removeAttribute('data-theme');
+}
+
+function updateThemeButton() {
+  var isDark = localStorage.getItem('darkMode') === 'true';
+  var btn = document.getElementById('themeToggle');
+  var label = document.getElementById('themeLabel');
+  var mobileBtn = document.getElementById('mobileThemeBtn');
+  var mobileLabel = document.getElementById('mobileThemeLabel');
+  
+  if (btn && label) {
+    var icon = btn.querySelector('i');
+    if (isDark) {
+      if (icon) icon.className = 'fas fa-sun';
+      label.textContent = 'Light Mode';
+    } else {
+      if (icon) icon.className = 'fas fa-moon';
+      label.textContent = 'Dark Mode';
+    }
+  }
+  
+  if (mobileBtn && mobileLabel) {
+    var mobileIcon = mobileBtn.querySelector('i');
+    if (isDark) {
+      if (mobileIcon) mobileIcon.className = 'fas fa-sun';
+      mobileLabel.textContent = 'Light Mode';
+    } else {
+      if (mobileIcon) mobileIcon.className = 'fas fa-moon';
+      mobileLabel.textContent = 'Dark Mode';
+    }
+  }
 }

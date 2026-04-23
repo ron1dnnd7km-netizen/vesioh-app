@@ -83,7 +83,7 @@ const services = [
   { id: 'fb', name: 'Facebook', region: 'United States', country: 'us', icon: 'https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg', iconClass: 'fb', price: 0.50, category: 'recommended' },
   { id: 'tg', name: 'Telegram', region: 'United States', country: 'us', icon: 'https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg', iconClass: 'tg', price: 0.45, category: 'recommended' }, 
   { id: 'ig', name: 'Instagram+Threads', region: 'United States', country: 'us', icon: 'https://upload.wikimedia.org/wikipedia/commons/9/95/Instagram_logo_2022.svg', iconClass: 'instagram', price: 0.60, category: 'recommended' },
-  { id: 'tk', name: 'TikTok/Douyin', region: 'United Kingdom', country: 'gb', icon: 'https://upload.wikimedia.org/wikipedia/commons/6/61/Tiktok_hyper.png', },
+  { id: 'tk', name: 'TikTok/Douyin', region: 'United Kingdom', country: 'gb', icon: 'https://upload.wikimedia.org/wikipedia/commons/6/61/Tiktok_hyper.png', iconClass: 'instagram', price: 0.15, category: 'recommended' },
   
   // Any service WITHOUT an image property will just hide the preview automatically!
   { id: 'any-other', name: 'Any other', region: 'United States', country: 'US', icon: 'https://upload.wikimedia.org/wikipedia/commons/6/63/World_Tourism_Day_Globe.svg', iconClass: 'other', price: 0.90, category: 'recommended' },

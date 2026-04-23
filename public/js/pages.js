@@ -35,7 +35,6 @@ function getServiceIconData(serviceName, serviceId, existingIcon) {
     'google': 'https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg',
     'netflix': 'https://upload.wikimedia.org/wikipedia/commons/0/09/Netflix_Icon.svg',
     'twitter': 'https://upload.wikimedia.org/wikipedia/commons/c/ce/X_logo_2023.svg',
-    'x ': 'https://upload.wikimedia.org/wikipedia/commons/c/ce/X_logo_2023.svg',
     'discord': 'https://upload.wikimedia.org/wikipedia/fr/4/4f/Discord_Logo_sans_text.svg',
     'steam': 'https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg',
     'uber': 'https://upload.wikimedia.org/wikipedia/commons/5/58/Uber_logo_2018.svg',
@@ -605,7 +604,8 @@ function renderHistoryPage(main) {
 }
         
      
-// ====== REFERRAL PROGRAM HELPERS ======
+// ====== REFERRAL PROGRAM HELPERS (defined once) ======
+
 window.generateRefCode = function(length) {
   length = length || 6;
   var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -640,15 +640,15 @@ window.switchRefTab = function(tab) {
   var withdContent = document.getElementById('refTabWithdrawals');
   
   if (tab === 'history') {
-    if(histBtn) { histBtn.style.background = 'var(--accent)'; histBtn.style.color = '#fff'; }
-    if(withdBtn) { withdBtn.style.background = 'var(--bg-primary)'; withdBtn.style.color = 'var(--text-secondary)'; }
-    if(histContent) histContent.style.display = 'block';
-    if(withdContent) withdContent.style.display = 'none';
+    if (histBtn) { histBtn.style.background = 'var(--accent)'; histBtn.style.color = '#fff'; }
+    if (withdBtn) { withdBtn.style.background = 'var(--bg-primary)'; withdBtn.style.color = 'var(--text-secondary)'; }
+    if (histContent) histContent.style.display = 'block';
+    if (withdContent) withdContent.style.display = 'none';
   } else {
-    if(withdBtn) { withdBtn.style.background = 'var(--accent)'; withdBtn.style.color = '#fff'; }
-    if(histBtn) { histBtn.style.background = 'var(--bg-primary)'; histBtn.style.color = 'var(--text-secondary)'; }
-    if(withdContent) withdContent.style.display = 'block';
-    if(histContent) histContent.style.display = 'none';
+    if (withdBtn) { withdBtn.style.background = 'var(--accent)'; withdBtn.style.color = '#fff'; }
+    if (histBtn) { histBtn.style.background = 'var(--bg-primary)'; histBtn.style.color = 'var(--text-secondary)'; }
+    if (withdContent) withdContent.style.display = 'block';
+    if (histContent) histContent.style.display = 'none';
   }
 };
 
@@ -657,12 +657,12 @@ window.requestWithdrawal = async function() {
   var address = document.getElementById('withdrawAddress');
   var amount = document.getElementById('withdrawAmount');
   
-  if(!method || !method.value) { showToast('Select withdrawal method', 'error'); return; }
-  if(!address || !address.value.trim()) { showToast('Enter wallet address or gift card details', 'error'); return; }
-  if(!amount || parseFloat(amount.value) <= 0) { showToast('Enter valid amount', 'error'); return; }
+  if (!method || !method.value) { showToast('Select withdrawal method', 'error'); return; }
+  if (!address || !address.value.trim()) { showToast('Enter wallet address or gift card details', 'error'); return; }
+  if (!amount || parseFloat(amount.value) <= 0) { showToast('Enter valid amount', 'error'); return; }
 
-  // Disable button and show loading
   var btn = document.querySelector('[onclick="requestWithdrawal()"]');
+  if (!btn) return;
   var originalText = btn.innerHTML;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
   btn.disabled = true;
@@ -673,8 +673,8 @@ window.requestWithdrawal = async function() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: getUserEmail(),
-        method: method.value,       // "crypto" or "giftcard"
-        address: address.value,     // Wallet address or email
+        method: method.value,
+        address: address.value.trim(),
         amount: parseFloat(amount.value)
       })
     });
@@ -687,8 +687,9 @@ window.requestWithdrawal = async function() {
       method.value = '';
       address.value = '';
       amount.value = '';
-      // Optionally switch to withdrawal history tab
       switchRefTab('withdrawals');
+      // Reload withdrawal history from backend
+      loadReferralHistory();
     }
   } catch (err) {
     showToast('Network error. Please try again.', 'error');
@@ -704,149 +705,238 @@ function copyReferralLink() {
     showToast('Referral link not ready yet', 'error');
     return;
   }
-  navigator.clipboard.writeText(el.dataset.link).then(function() { showToast('Referral link copied', 'success'); }).catch(function() { showToast('Failed to copy', 'error'); });
+  navigator.clipboard.writeText(el.dataset.link)
+    .then(function() { showToast('Referral link copied', 'success'); })
+    .catch(function() { showToast('Failed to copy', 'error'); });
 }
+
+// ====== HELPERS TO POPULATE HISTORY FROM BACKEND ======
+
+window.loadReferralHistory = async function() {
+  try {
+    var res = await fetch('/api/user/' + getUserEmail());
+    if (!res.ok) return;
+    var data = await res.json();
+
+    // --- Populate referral history ---
+    var referrals = data.referrals || data.referralHistory || [];
+    var histContainer = document.getElementById('refTabHistory');
+    if (histContainer) {
+      if (referrals.length === 0) {
+        histContainer.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">No referrals yet</div>';
+      } else {
+        histContainer.innerHTML = referrals.map(function(r) {
+          var dateStr = r.date || (r.created_at ? new Date(r.created_at).toLocaleDateString() : '—');
+          var email = r.email || r.referee || 'Unknown';
+          var earned = '$' + (r.earned || r.commission || 0).toFixed(2);
+          var status = r.status || 'Pending';
+          var statusColor = status === 'Paid' ? 'var(--accent)' : 'var(--warning)';
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;">' +
+            '<div><span style="color:var(--text-muted);">' + dateStr + '</span> — ' + email + '</div>' +
+            '<div style="font-weight:700;color:var(--accent);">' + earned + ' <span style="font-size:10px;color:' + statusColor + ';">(' + status + ')</span></div></div>';
+        }).join('');
+      }
+    }
+
+    // --- Populate withdrawal history ---
+    var withdrawals = data.withdrawals || data.withdrawalHistory || [];
+    var withdContainer = document.getElementById('refTabWithdrawals');
+    if (withdContainer) {
+      if (withdrawals.length === 0) {
+        withdContainer.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">No withdrawals yet</div>';
+      } else {
+        withdContainer.innerHTML = withdrawals.map(function(w) {
+          var dateStr = w.date || (w.created_at ? new Date(w.created_at).toLocaleDateString() : '—');
+          var methodLabel = w.method || 'Unknown';
+          var amt = '$' + (w.amount || 0).toFixed(2);
+          var status = w.status || 'Pending';
+          var statusColor = status === 'Completed' ? 'var(--accent)' : status === 'Pending' ? 'var(--warning)' : 'var(--danger)';
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;">' +
+            '<div><span style="color:var(--text-muted);">' + dateStr + '</span><br><span style="font-size:11px;">' + methodLabel + '</span></div>' +
+            '<div style="font-weight:700;color:var(--accent);">' + amt + ' <span style="font-size:10px;color:' + statusColor + ';">(' + status + ')</span></div></div>';
+        }).join('');
+      }
+    }
+  } catch (err) {
+    // Silent fail — page already shows "No referrals yet" placeholder
+  }
+};
 
 // ====== REFERRAL PAGE RENDER ======
-// ====== REFERRAL PROGRAM HELPERS ======
-window.generateRefCode = function(length) {
-  length = length || 6;
-  var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  var result = 'REF-';
-  for (var i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-};
 
-window.toggleReadMore = function() {
-  var short = document.getElementById('refDescShort');
-  var full = document.getElementById('refDescFull');
-  var btn = document.getElementById('readMoreBtn');
-  if (!short || !full || !btn) return;
-  
-  if (full.style.display === 'none') {
-    short.style.display = 'none';
-    full.style.display = 'block';
-    btn.textContent = 'Read less...';
-  } else {
-    short.style.display = 'block';
-    full.style.display = 'none';
-    btn.textContent = 'Read more...';
-  }
-};
+async function renderSettingsPage(main) {
 
-window.switchRefTab = function(tab) {
-  var histBtn = document.getElementById('tabBtnHistory');
-  var withdBtn = document.getElementById('tabBtnWithdrawals');
-  var histContent = document.getElementById('refTabHistory');
-  var withdContent = document.getElementById('refTabWithdrawals');
-  
-  if (tab === 'history') {
-    if(histBtn) { histBtn.style.background = 'var(--accent)'; histBtn.style.color = '#fff'; }
-    if(withdBtn) { withdBtn.style.background = 'var(--bg-primary)'; withdBtn.style.color = 'var(--text-secondary)'; }
-    if(histContent) histContent.style.display = 'block';
-    if(withdContent) withdContent.style.display = 'none';
-  } else {
-    if(withdBtn) { withdBtn.style.background = 'var(--accent)'; withdBtn.style.color = '#fff'; }
-    if(histBtn) { histBtn.style.background = 'var(--bg-primary)'; histBtn.style.color = 'var(--text-secondary)'; }
-    if(withdContent) withdContent.style.display = 'block';
-    if(histContent) histContent.style.display = 'none';
-  }
-};
+  // Render HTML skeleton FIRST (with empty placeholders)
+  main.innerHTML =
+    '<div class="page-header"><h1 class="page-title">Referral Program</h1></div>' +
+    '<div style="max-width:980px;margin:0 auto;display:grid;gap:22px;">' +
 
-window.requestWithdrawal = function() {
-  var method = document.getElementById('withdrawMethod');
-  var address = document.getElementById('withdrawAddress');
-  var amount = document.getElementById('withdrawAmount');
-  
-  if(!method || !method.value) { showToast('Select withdrawal method', 'error'); return; }
-  if(!address || !address.value.trim()) { showToast('Enter wallet address or gift card details', 'error'); return; }
-  if(!amount || parseFloat(amount.value) <= 0) { showToast('Enter valid amount', 'error'); return; }
-  
-  // TODO: Connect to your backend API here
-  showToast('Withdrawal request submitted successfully!', 'success');
-};
+      // 1. INTRO
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:26px;box-shadow:var(--shadow-sm);">' +
+        '<h2 style="font-size:24px;font-weight:700;margin-bottom:10px;">Recommend the service and earn money</h2>' +
+        '<div id="refDescShort">' +
+          '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin:0;">Share your referral link with friends and earn 5% of every purchase they make.</p>' +
+        '</div>' +
+        '<div id="refDescFull" style="display:none;">' +
+          '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin:0 0 12px 0;">Share your referral link with friends and earn 5% of every purchase made by users who sign up through your link. There is no limit to how much you can earn.</p>' +
+          '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin:0;">The bonus is automatically added to your balance. Share your referral link on social media, chat, or email to grow your earnings. You can withdraw your commissions anytime via Crypto or Gift Cards.</p>' +
+        '</div>' +
+        '<button class="btn btn-secondary" style="margin-top:16px;" id="readMoreBtn" onclick="toggleReadMore()">Read more...</button>' +
+      '</div>' +
 
-function copyReferralLink() {
-  var el = document.getElementById('referralLink');
-  if (!el || !el.dataset.link) {
-    showToast('Referral link not ready yet', 'error');
-    return;
+      // 2. STATS
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;">' +
+        '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
+          '<div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px;">Total Commissions</div>' +
+          '<div style="font-size:32px;font-weight:800;color:var(--accent);margin-bottom:4px;" id="refTotalCommissions">$0.00</div>' +
+          '<div style="font-size:13px;color:var(--text-secondary);">Lifetime earnings</div>' +
+        '</div>' +
+        '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
+          '<div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px;">Referral Count</div>' +
+          '<div style="font-size:32px;font-weight:800;color:var(--text-primary);margin-bottom:4px;" id="refCount">0</div>' +
+          '<div style="font-size:13px;color:var(--text-secondary);">Total friends invited</div>' +
+        '</div>' +
+      '</div>' +
+
+      // 3. REFERRAL LINK
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
+        '<div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px;">Your REF code</div>' +
+        '<div style="font-size:14px;color:var(--text-primary);line-height:1.6;margin-bottom:16px;word-break:break-all;" id="referralLink">Loading...</div>' +
+        '<button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="copyReferralLink()"><i class="fas fa-copy" style="margin-right:6px;"></i> Copy referral link</button>' +
+      '</div>' +
+
+      // 4. WITHDRAWAL FORM
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
+        '<h3 style="font-size:18px;font-weight:700;margin-bottom:20px;"><i class="fas fa-arrow-right-from-bracket" style="color:var(--accent);margin-right:8px;"></i>Withdraw Commissions</h3>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">' +
+          '<div>' +
+            '<label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Withdrawal Method</label>' +
+            '<select id="withdrawMethod" class="form-select" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-primary);color:var(--text-primary);font-size:14px;">' +
+              '<option value="">Select method...</option>' +
+              '<option value="crypto">Crypto (USDT, BTC, ETH)</option>' +
+              '<option value="giftcard">Gift Card (Amazon, Apple)</option>' +
+            '</select>' +
+          '</div>' +
+          '<div>' +
+            '<label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Withdraw ($)</label>' +
+            '<input type="number" id="withdrawAmount" class="form-input" placeholder="0.00" min="1" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-primary);color:var(--text-primary);font-size:14px;">' +
+          '</div>' +
+        '</div>' +
+        '<div style="margin-bottom:20px;">' +
+          '<label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Wallet Address / Gift Card Email</label>' +
+          '<input type="text" id="withdrawAddress" class="form-input" placeholder="Enter your wallet address or email" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-primary);color:var(--text-primary);font-size:14px;">' +
+        '</div>' +
+        '<button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;" onclick="requestWithdrawal()"><i class="fas fa-paper-plane" style="margin-right:6px;"></i> Request Withdrawal</button>' +
+      '</div>' +
+
+      // 5. HISTORY TABS
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
+        '<div style="display:flex;gap:10px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:10px;">' +
+          '<button id="tabBtnHistory" onclick="switchRefTab(\'history\')" style="flex:1;padding:10px;border-radius:8px;border:none;cursor:pointer;font-weight:600;font-size:14px;background:var(--accent);color:#fff;transition:0.2s;">Referral History</button>' +
+          '<button id="tabBtnWithdrawals" onclick="switchRefTab(\'withdrawals\')" style="flex:1;padding:10px;border-radius:8px;border:none;cursor:pointer;font-weight:600;font-size:14px;background:var(--bg-primary);color:var(--text-secondary);transition:0.2s;">Withdrawal History</button>' +
+        '</div>' +
+        '<div id="refTabHistory"><div style="text-align:center;padding:20px;color:var(--text-muted);">Loading...</div></div>' +
+        '<div id="refTabWithdrawals" style="display:none;"><div style="text-align:center;padding:20px;color:var(--text-muted);">Loading...</div></div>' +
+      '</div>' +
+
+    '</div>';
+
+  // --- NOW FETCH REAL DATA FROM BACKEND ---
+  try {
+    var res = await fetch('/api/user/' + getUserEmail());
+    if (!res.ok) throw new Error('Unable to load referral data');
+    var data = await res.json();
+
+    // 1. Handle referral code
+    var referralCode = data.refCode || data.referral_code || '';
+    var isEmail = /[@]/.test(referralCode);
+
+    if (!referralCode || isEmail) {
+      var newCode = window.generateRefCode(6);
+
+      try {
+        var saveRes = await fetch('/api/user/refcode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: getUserEmail(), refCode: newCode })
+        });
+        var saveData = await saveRes.json();
+
+        if (!saveData.error) {
+          referralCode = newCode;
+        } else {
+          var linkEl = document.getElementById('referralLink');
+          if (linkEl) linkEl.textContent = 'Error generating code. Contact support.';
+          return;
+        }
+      } catch (e) {
+        var linkEl2 = document.getElementById('referralLink');
+        if (linkEl2) linkEl2.textContent = 'Network error.';
+        return;
+      }
+    }
+
+    // Set the referral link
+    var url = window.location.origin + '/?ref=' + referralCode;
+    var linkElFinal = document.getElementById('referralLink');
+    if (linkElFinal) {
+      linkElFinal.textContent = url;
+      linkElFinal.dataset.link = url;
+    }
+
+    // 2. Populate stats
+    var commEl = document.getElementById('refTotalCommissions');
+    if (commEl) commEl.textContent = '$' + (data.totalCommissions || data.commissions || 0).toFixed(2);
+
+    var countEl = document.getElementById('refCount');
+    if (countEl) countEl.textContent = (data.referralCount || data.refCount || 0);
+
+    // 3. Populate history tabs from backend data
+    // Referral history
+    var referrals = data.referrals || data.referralHistory || [];
+    var histContainer = document.getElementById('refTabHistory');
+    if (histContainer) {
+      if (referrals.length === 0) {
+        histContainer.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">No referrals yet</div>';
+      } else {
+        histContainer.innerHTML = referrals.map(function(r) {
+          var dateStr = r.date || (r.created_at ? new Date(r.created_at).toLocaleDateString() : '—');
+          var email = r.email || r.referee || 'Unknown';
+          var earned = '$' + (r.earned || r.commission || 0).toFixed(2);
+          var status = r.status || 'Pending';
+          var statusColor = status === 'Paid' ? 'var(--accent)' : 'var(--warning)';
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;">' +
+            '<div><span style="color:var(--text-muted);">' + dateStr + '</span> — ' + email + '</div>' +
+            '<div style="font-weight:700;color:var(--accent);">' + earned + ' <span style="font-size:10px;color:' + statusColor + ';">(' + status + ')</span></div></div>';
+        }).join('');
+      }
+    }
+
+    // Withdrawal history
+    var withdrawals = data.withdrawals || data.withdrawalHistory || [];
+    var withdContainer = document.getElementById('refTabWithdrawals');
+    if (withdContainer) {
+      if (withdrawals.length === 0) {
+        withdContainer.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">No withdrawals yet</div>';
+      } else {
+        withdContainer.innerHTML = withdrawals.map(function(w) {
+          var dateStr = w.date || (w.created_at ? new Date(w.created_at).toLocaleDateString() : '—');
+          var methodLabel = w.method || 'Unknown';
+          var amt = '$' + (w.amount || 0).toFixed(2);
+          var status = w.status || 'Pending';
+          var statusColor = status === 'Completed' ? 'var(--accent)' : status === 'Pending' ? 'var(--warning)' : 'var(--danger)';
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;">' +
+            '<div><span style="color:var(--text-muted);">' + dateStr + '</span><br><span style="font-size:11px;">' + methodLabel + '</span></div>' +
+            '<div style="font-weight:700;color:var(--accent);">' + amt + ' <span style="font-size:10px;color:' + statusColor + ';">(' + status + ')</span></div></div>';
+        }).join('');
+      }
+    }
+
+  } catch (err) {
+    showToast(err.message, 'error');
   }
-  navigator.clipboard.writeText(el.dataset.link).then(function() { showToast('Referral link copied', 'success'); }).catch(function() { showToast('Failed to copy', 'error'); });
 }
 
-// ====== REFERRAL PROGRAM HELPERS ======
-window.generateRefCode = function(length) {
-  length = length || 6;
-  var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  var result = 'REF-';
-  for (var i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-};
-
-window.toggleReadMore = function() {
-  var short = document.getElementById('refDescShort');
-  var full = document.getElementById('refDescFull');
-  var btn = document.getElementById('readMoreBtn');
-  if (!short || !full || !btn) return;
-  
-  if (full.style.display === 'none') {
-    short.style.display = 'none';
-    full.style.display = 'block';
-    btn.textContent = 'Read less...';
-  } else {
-    short.style.display = 'block';
-    full.style.display = 'none';
-    btn.textContent = 'Read more...';
-  }
-};
-
-window.switchRefTab = function(tab) {
-  var histBtn = document.getElementById('tabBtnHistory');
-  var withdBtn = document.getElementById('tabBtnWithdrawals');
-  var histContent = document.getElementById('refTabHistory');
-  var withdContent = document.getElementById('refTabWithdrawals');
-  
-  if (tab === 'history') {
-    if(histBtn) { histBtn.style.background = 'var(--accent)'; histBtn.style.color = '#fff'; }
-    if(withdBtn) { withdBtn.style.background = 'var(--bg-primary)'; withdBtn.style.color = 'var(--text-secondary)'; }
-    if(histContent) histContent.style.display = 'block';
-    if(withdContent) withdContent.style.display = 'none';
-  } else {
-    if(withdBtn) { withdBtn.style.background = 'var(--accent)'; withdBtn.style.color = '#fff'; }
-    if(histBtn) { histBtn.style.background = 'var(--bg-primary)'; histBtn.style.color = 'var(--text-secondary)'; }
-    if(withdContent) withdContent.style.display = 'block';
-    if(histContent) histContent.style.display = 'none';
-  }
-};
-
-window.requestWithdrawal = function() {
-  var method = document.getElementById('withdrawMethod');
-  var address = document.getElementById('withdrawAddress');
-  var amount = document.getElementById('withdrawAmount');
-  
-  if(!method || !method.value) { showToast('Select withdrawal method', 'error'); return; }
-  if(!address || !address.value.trim()) { showToast('Enter wallet address or gift card details', 'error'); return; }
-  if(!amount || parseFloat(amount.value) <= 0) { showToast('Enter valid amount', 'error'); return; }
-  
-  // TODO: Connect to your backend API here
-  showToast('Withdrawal request submitted successfully!', 'success');
-};
-
-function copyReferralLink() {
-  var el = document.getElementById('referralLink');
-  if (!el || !el.dataset.link) {
-    showToast('Referral link not ready yet', 'error');
-    return;
-  }
-  navigator.clipboard.writeText(el.dataset.link).then(function() { showToast('Referral link copied', 'success'); }).catch(function() { showToast('Failed to copy', 'error'); });
-}
-
-// ====== REFERRAL PAGE RENDER ======
 async function renderSettingsPage(main) {
   
   // EMPTIED BOTH: Will show empty states until backend provides real data
@@ -940,35 +1030,51 @@ async function renderSettingsPage(main) {
 
     '</div>';
 
-    // --- FETCH DATA FROM BACKEND & POPULATE ---
+      // --- FETCH DATA FROM BACKEND & POPULATE ---
   try {
     var res = await fetch('/api/user/' + getUserEmail());
     if (!res.ok) throw new Error('Unable to load referral data');
     var data = await res.json();
     
-    // 1. Handle Referral Code
-    var referralCode = data.refCode || '';
+    // 1. Handle Referral Code (Check both 'refCode' and 'referral_code' just in case)
+    var referralCode = data.refCode || data.referral_code || '';
     var isEmail = /[@]/.test(referralCode); 
     
     // If backend has no code, or mistakenly saved an email, generate a new one
     if (!referralCode || isEmail) {
-      referralCode = window.generateRefCode(6); 
+      var newCode = window.generateRefCode(6); 
       
-      // SAVE IT TO BACKEND so the database knows the new code!
+      // SAVE IT TO BACKEND and wait for the response!
       try {
-        await fetch('/api/user/refcode', {
+        var saveRes = await fetch('/api/user/refcode', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: getUserEmail(), refCode: referralCode })
+          body: JSON.stringify({ email: getUserEmail(), refCode: newCode })
         });
-      } catch(e) { console.error("Failed to save ref code to backend", e); }
+        
+        var saveData = await saveRes.json();
+        
+        // CRITICAL FIX: ONLY use the new code if the backend actually saved it!
+        if (!saveData.error) {
+          referralCode = newCode; 
+        } else {
+          // If backend failed to save, show error instead of a fake temporary code
+          var linkEl = document.getElementById('referralLink');
+          if (linkEl) linkEl.textContent = 'Error generating code. Contact support.';
+          return; // Stop the function here
+        }
+      } catch(e) { 
+        var linkEl2 = document.getElementById('referralLink');
+        if (linkEl2) linkEl2.textContent = 'Network error.'; 
+        return; // Stop here
+      }
     }
     
     var url = window.location.origin + '/?ref=' + referralCode;
-    var linkEl = document.getElementById('referralLink');
-    if (linkEl) {
-      linkEl.textContent = url;
-      linkEl.dataset.link = url;
+    var linkElFinal = document.getElementById('referralLink');
+    if (linkElFinal) {
+      linkElFinal.textContent = url;
+      linkElFinal.dataset.link = url;
     }
 
     // 2. Populate Stats
@@ -1006,11 +1112,11 @@ function renderContactsPage(main) {
     '<div style="display:flex;flex-direction:column;gap:12px;">' +
     '<div style="display:flex;align-items:center;gap:12px;">' +
     '<i class="fas fa-envelope" style="color:var(--accent);font-size:18px;"></i>' +
-    '<div><div style="font-size:14px;font-weight:600;">Email</div><div style="font-size:14px;color:var(--text-secondary);">backwoti11@gmail.com</div></div>' +
+    '<div><div style="font-size:14px;font-weight:600;">Email</div><div style="font-size:14px;color:var(--text-secondary);">getsonverify@hotmail.com</div></div>' +
     '</div>' +
     '<div style="display:flex;align-items:center;gap:12px;">' +
-    '<i class="fas fa-phone" style="color:var(--accent);font-size:18px;"></i>' +
-    '<div><div style="font-size:14px;font-weight:600;">Phone</div><div style="font-size:14px;color:var(--text-secondary);">+13146438883</div></div>' +
+    '<i class="fas fa-telegram" style="color:var(--accent);font-size:18px;"></i>' +
+    '<div><div style="font-size:14px;font-weight:600;">Telegram</div><div style="font-size:14px;color:var(--text-secondary);">Getsonverify</div></div>' +
     '</div>' +
     '</div>' +
     '</div>' +

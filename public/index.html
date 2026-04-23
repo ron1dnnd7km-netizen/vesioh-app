@@ -19,12 +19,12 @@
         <!-- Mobile Logo - data-notranslate added -->
         <div class="nav-center-logo" style="display:none;" data-notranslate>
           <div class="logo-icon"><i class="fas fa-comment-dots"></i></div>
-          SMS Virtual <span>Code</span>
+          SonVerify <span>
         </div>
         <!-- Desktop Logo - data-notranslate added -->
         <div class="logo" data-notranslate>
           <div class="logo-icon"><i class="fas fa-comment-dots"></i></div>
-          SMS Virtual <span>Code</span>
+          SonVerify <span>
         </div>
         <div class="nav-links">
           <button type="button" class="nav-link active" data-page="numbers" data-i18n="Home">Home</button>
@@ -61,6 +61,7 @@
           </div>
           <div class="user-dropdown">
             <button type="button" onclick="navigateTo('settings')"><i class="fas fa-cog"></i> <span data-i18n="Settings">Settings</span></button>
+            <button type="button" onclick="toggleTheme()" id="themeToggle"><i class="fas fa-moon"></i> <span id="themeLabel">Dark Mode</span></button>
             <div class="divider"></div>
             <button type="button" onclick="logout()"><i class="fas fa-sign-out-alt"></i> <span data-i18n="Logout">Logout</span></button>
             <button type="button" onclick="deleteAccount()"><i class="fas fa-trash"></i> <span data-i18n="Delete Account">Delete Account</span></button>
@@ -94,6 +95,12 @@
                 <button type="button" onclick="changeLanguage('zh')"><span>🇨🇳</span> <span data-i18n="Chinese">中文</span></button>
                 <button type="button" onclick="changeLanguage('ru')"><span>🇷🇺</span> <span data-i18n="Russian">Русский</span></button>
               </div>
+            </li>
+            <li class="theme-item">
+              <button type="button" class="menu-theme-btn" id="mobileThemeBtn" onclick="toggleTheme(); closeMobileSidebar()">
+                <i class="fas fa-moon"></i>
+                <span id="mobileThemeLabel">Dark Mode</span>
+              </button>
             </li>
             <li class="menu-divider"></li>
             <li class="email-item" id="mobileEmail">user@email.com</li>

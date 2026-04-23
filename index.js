@@ -129,11 +129,98 @@ app.post('/api/auth/forgot-password', function(req, res) {
   res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
 });
 
-// ====== USER ======
+// ====== USER (FIXED REFERRAL CODE LOGIC) ======
+// ====== USER (SAFE FOR POSTGRES) ======
 app.get('/api/user/:email', async function(req, res) {
-  var user = await db.prepare('SELECT balance, email as refCode FROM users WHERE email = $1').get(req.params.email);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  res.json({ balance: user.balance, refCode: user.refCode });
+  try {
+    var email = req.params.email;
+    var user = await db.prepare('SELECT balance, referral_code FROM users WHERE email = $1').get(email);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // 1. Generate referral code if missing
+    var referralCode = user.referral_code;
+    if (!referralCode) {
+      referralCode = 'REF-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+      await db.prepare('UPDATE users SET referral_code = $1 WHERE email = $2').run(referralCode, email);
+    }
+
+    // 2. Get referral count
+    var countResult = await db.prepare('SELECT COUNT(*) as total FROM users WHERE referred_by = $1').get(email);
+    var totalReferrals = countResult ? parseInt(countResult.total) : 0;
+
+    // 3. Calculate total commissions
+    var historyResult = await db.prepare("SELECT COALESCE(SUM(cost), 0) as total_spent FROM history WHERE email IN (SELECT email FROM users WHERE referred_by = $1) AND status = 'success'").get(email);
+    var totalCommissions = historyResult ? (parseFloat(historyResult.total_spent) * 0.05) : 0;
+
+    // 4. Build referrals array
+    var referrals = [];
+    try {
+      var referredUsers = await db.prepare('SELECT email, created_at FROM users WHERE referred_by = $1 ORDER BY created_at DESC').all(email);
+      for (var i = 0; i < referredUsers.length; i++) {
+        var refEmail = referredUsers[i].email;
+        var spentResult = await db.prepare("SELECT COALESCE(SUM(cost), 0) as total FROM history WHERE email = $1 AND status = 'success'").get(refEmail);
+        var spent = spentResult ? parseFloat(spentResult.total) : 0;
+        var commission = spent * 0.05;
+        referrals.push({
+          email: refEmail,
+          earned: '$' + commission.toFixed(2),
+          status: commission > 0 ? 'Paid' : 'Pending',
+          date: new Date(referredUsers[i].created_at).toLocaleDateString()
+        });
+      }
+    } catch (e) {
+      console.log('Referrals skipped:', e.message);
+    }
+
+    // 5. Get withdrawals array (SAFE - won't crash if table missing)
+    var withdrawals = [];
+    try {
+      var wdRows = await db.prepare('SELECT method, amount, status, created_at FROM withdrawals WHERE email = $1 ORDER BY created_at DESC').all(email);
+      withdrawals = wdRows.map(function(w) {
+        return {
+          method: w.method === 'crypto' ? 'Crypto' : w.method === 'giftcard' ? 'Gift Card' : w.method,
+          amount: '$' + parseFloat(w.amount).toFixed(2),
+          status: w.status.charAt(0).toUpperCase() + w.status.slice(1),
+          date: new Date(w.created_at).toLocaleDateString()
+        };
+      });
+    } catch (e) {
+      console.log('Withdrawals skipped:', e.message);
+    }
+
+    // 6. Return everything
+    res.json({
+      balance: user.balance,
+      refCode: referralCode,
+      referralCount: totalReferrals,
+      totalCommissions: totalCommissions,
+      referrals: referrals,
+      withdrawals: withdrawals
+    });
+  } catch (err) {
+    console.error('User API error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST route to save referral code from frontend (Safety net)
+app.post('/api/user/refcode', async function(req, res) {
+  try {
+    var { email, refCode } = req.body;
+    if (!email || !refCode) return res.status(400).json({ error: 'Missing data' });
+
+    // Only update if they don't have one yet
+    var user = await db.prepare('SELECT referral_code FROM users WHERE email = $1').get(email);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    if (!user.referral_code) {
+      await db.prepare('UPDATE users SET referral_code = $1 WHERE email = $2').run(refCode, email);
+    }
+    
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ====== PLISIO HELPER ======
@@ -415,6 +502,43 @@ app.get('/api/referral/stats/:email', async function(req, res) {
     totalEarnings: totalEarnings.toFixed(2),
     list: referredUsers
   });
+});
+
+// ====== WITHDRAWAL REQUEST ======
+app.post('/api/withdraw', async function(req, res) {
+  try {
+    var email = req.body.email;
+    var method = req.body.method;
+    var address = req.body.address;
+    var amount = parseFloat(req.body.amount);
+
+    if (!email || !method || !address || !amount) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+    if (amount < 1) {
+      return res.status(400).json({ error: 'Minimum withdrawal is $1.00' });
+    }
+
+    // Calculate available commission balance
+    var historyResult = await db.prepare("SELECT COALESCE(SUM(cost), 0) as total_spent FROM history WHERE email IN (SELECT email FROM users WHERE referred_by = $1) AND status = 'success'").get(email);
+    var totalCommissions = historyResult ? (parseFloat(historyResult.total_spent) * 0.05) : 0;
+
+    // Subtract already withdrawn
+    var withdrawnResult = await db.prepare("SELECT COALESCE(SUM(amount), 0) as total FROM withdrawals WHERE email = $1 AND status != 'rejected'").get(email);
+    var alreadyWithdrawn = withdrawnResult ? parseFloat(withdrawnResult.total) : 0;
+    var available = totalCommissions - alreadyWithdrawn;
+
+    if (amount > available) {
+      return res.status(400).json({ error: 'Insufficient commission balance. Available: $' + available.toFixed(2) });
+    }
+
+    await db.prepare('INSERT INTO withdrawals (email, method, address, amount, status) VALUES ($1, $2, $3, $4, $5)').run(email, method, address, amount, 'pending');
+
+    res.json({ success: true, message: 'Withdrawal request submitted' });
+  } catch (err) {
+    console.error('Withdrawal error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ====== CATCH-ALL ======
