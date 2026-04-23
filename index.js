@@ -541,6 +541,255 @@ app.post('/api/withdraw', async function(req, res) {
   }
 });
 
+// ====== ADMIN AUTH ======
+var ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'SonVerify2025';
+console.log('ADMIN_PASSWORD is:', ADMIN_PASSWORD);
+
+app.post('/api/admin/login', function(req, res) {
+  if (req.body.password === ADMIN_PASSWORD) {
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ error: 'Invalid admin password' });
+  }
+});
+
+// Middleware to check admin session
+function requireAdmin(req, res, next) {
+  var token = req.headers['authorization'];
+  if (!token || token !== 'Bearer admin-' + ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
+
+// ====== ADMIN: DASHBOARD STATS ======
+app.get('/api/admin/stats', requireAdmin, async function(req, res) {
+  try {
+    var userCount = await db.prepare('SELECT COUNT(*) as total FROM users').get();
+    var balanceResult = await db.prepare('SELECT COALESCE(SUM(balance), 0) as total FROM users').get();
+    var activeNumbers = await db.prepare("SELECT COUNT(*) as total FROM numbers WHERE status IN ('waiting', 'received')").get();
+    var todayDeposits = await db.prepare("SELECT COALESCE(SUM(amount), 0) as total FROM deposits WHERE status = 'completed' AND created_at >= CURRENT_DATE").get();
+    var totalDeposits = await db.prepare("SELECT COALESCE(SUM(amount), 0) as total FROM deposits WHERE status = 'completed'").get();
+    var pendingWithdrawals = await db.prepare("SELECT COUNT(*) as total FROM withdrawals WHERE status = 'pending'").get();
+    var totalCommissions = await db.prepare("SELECT COALESCE(SUM(cost), 0) as total FROM history WHERE status = 'success' AND email IN (SELECT email FROM users WHERE referred_by IS NOT NULL)").get();
+    var referralCount = await db.prepare("SELECT COUNT(*) as total FROM users WHERE referred_by IS NOT NULL").get();
+
+    res.json({
+      totalUsers: parseInt(userCount.total),
+      totalBalance: parseFloat(balanceResult.total),
+      activeNumbers: parseInt(activeNumbers.total),
+      todayDeposits: parseFloat(todayDeposits.total),
+      totalDeposits: parseFloat(totalDeposits.total),
+      pendingWithdrawals: parseInt(pendingWithdrawals.total),
+      totalCommissions: parseFloat(totalCommissions.total) * 0.05,
+      totalReferrals: parseInt(referralCount.total)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ====== ADMIN: ALL USERS ======
+app.get('/api/admin/users', requireAdmin, async function(req, res) {
+  try {
+    var search = req.query.search || '';
+    var page = parseInt(req.query.page) || 1;
+    var limit = 20;
+    var offset = (page - 1) * limit;
+
+    var whereClause = search ? "WHERE email ILIKE $" + 1 + " OR referral_code ILIKE $" + 1 : "";
+    var params = search ? ['%' + search + '%'] : [];
+
+    var countResult = await db.prepare('SELECT COUNT(*) as total FROM users ' + whereClause).get(...params);
+    var users = await db.prepare('SELECT email, balance, referral_code, referred_by, created_at FROM users ' + whereClause + ' ORDER BY created_at DESC LIMIT ' + limit + ' OFFSET ' + offset).all(...params);
+
+    // Get extra stats for each user
+    var enriched = [];
+    for (var i = 0; i < users.length; i++) {
+      var u = users[i];
+      var purchaseResult = await db.prepare("SELECT COALESCE(SUM(cost), 0) as total FROM history WHERE email = $1 AND status = 'success'").get(u.email);
+      var refCountResult = await db.prepare('SELECT COUNT(*) as total FROM users WHERE referred_by = $1').get(u.email);
+      enriched.push({
+        email: u.email,
+        balance: parseFloat(u.balance),
+        referral_code: u.referral_code,
+        referred_by: u.referred_by,
+        created_at: u.created_at,
+        total_spent: parseFloat(purchaseResult.total),
+        referral_count: parseInt(refCountResult.total)
+      });
+    }
+
+    res.json({
+      users: enriched,
+      total: parseInt(countResult.total),
+      pages: Math.ceil(parseInt(countResult.total) / limit)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ====== ADMIN: SINGLE USER DETAIL ======
+app.get('/api/admin/user/:email', requireAdmin, async function(req, res) {
+  try {
+    var email = req.params.email;
+    var user = await db.prepare('SELECT email, balance, referral_code, referred_by, created_at FROM users WHERE email = $1').get(email);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    var numbers = await db.prepare('SELECT * FROM numbers WHERE email = $1 ORDER BY created_at DESC LIMIT 50').all(email);
+    var history = await db.prepare('SELECT * FROM history WHERE email = $1 ORDER BY created_at DESC LIMIT 50').all(email);
+    var deposits = await db.prepare('SELECT * FROM deposits WHERE email = $1 ORDER BY created_at DESC').all(email);
+    var withdrawals = await db.prepare('SELECT * FROM withdrawals WHERE email = $1 ORDER BY created_at DESC').all(email);
+    var referredUsers = await db.prepare('SELECT email, created_at FROM users WHERE referred_by = $1 ORDER BY created_at DESC').all(email);
+
+    res.json({
+      user: user,
+      numbers: numbers,
+      history: history,
+      deposits: deposits,
+      withdrawals: withdrawals,
+      referred_users: referredUsers
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ====== ADMIN: ADJUST USER BALANCE ======
+app.post('/api/admin/user/:email/balance', requireAdmin, async function(req, res) {
+  try {
+    var email = req.params.email;
+    var amount = parseFloat(req.body.amount);
+    var reason = req.body.reason || 'Admin adjustment';
+
+    if (isNaN(amount)) return res.status(400).json({ error: 'Invalid amount' });
+
+    var user = await db.prepare('SELECT balance FROM users WHERE email = $1').get(email);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    await db.prepare('UPDATE users SET balance = balance + $1 WHERE email = $2').run(amount, email);
+
+    var newBalance = await db.prepare('SELECT balance FROM users WHERE email = $1').get(email);
+    res.json({ success: true, newBalance: parseFloat(newBalance.balance), adjustment: amount });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ====== ADMIN: ALL WITHDRAWALS ======
+app.get('/api/admin/withdrawals', requireAdmin, async function(req, res) {
+  try {
+    var status = req.query.status || '';
+    var page = parseInt(req.query.page) || 1;
+    var limit = 20;
+    var offset = (page - 1) * limit;
+
+    var whereClause = status ? "WHERE w.status = $1" : "";
+    var params = status ? [status] : [];
+
+    var countResult = await db.prepare('SELECT COUNT(*) as total FROM withdrawals w ' + whereClause).get(...params);
+    var rows = await db.prepare(
+      'SELECT w.*, u.balance as user_balance FROM withdrawals w LEFT JOIN users u ON w.email = u.email ' + whereClause + ' ORDER BY w.created_at DESC LIMIT ' + limit + ' OFFSET ' + offset
+    ).all(...params);
+
+    res.json({
+      withdrawals: rows,
+      total: parseInt(countResult.total),
+      pages: Math.ceil(parseInt(countResult.total) / limit)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ====== ADMIN: APPROVE / REJECT WITHDRAWAL ======
+app.post('/api/admin/withdrawal/:id', requireAdmin, async function(req, res) {
+  try {
+    var id = req.params.id;
+    var action = req.body.action; // 'approve' or 'reject'
+    var adminNote = req.body.note || '';
+
+    if (action !== 'approve' && action !== 'reject') {
+      return res.status(400).json({ error: 'Action must be approve or reject' });
+    }
+
+    var wd = await db.prepare('SELECT * FROM withdrawals WHERE id = $1').get(id);
+    if (!wd) return res.status(404).json({ error: 'Withdrawal not found' });
+    if (wd.status !== 'pending') return res.status(400).json({ error: 'Already processed' });
+
+    var newStatus = action === 'approve' ? 'completed' : 'rejected';
+    await db.prepare('UPDATE withdrawals SET status = $1 WHERE id = $2').run(newStatus, id);
+
+    res.json({ success: true, status: newStatus });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ====== ADMIN: ALL DEPOSITS ======
+app.get('/api/admin/deposits', requireAdmin, async function(req, res) {
+  try {
+    var status = req.query.status || '';
+    var page = parseInt(req.query.page) || 1;
+    var limit = 20;
+    var offset = (page - 1) * limit;
+
+    var whereClause = status ? "WHERE status = $1" : "";
+    var params = status ? [status] : [];
+
+    var countResult = await db.prepare('SELECT COUNT(*) as total FROM deposits ' + whereClause).get(...params);
+    var rows = await db.prepare('SELECT * FROM deposits ' + whereClause + ' ORDER BY created_at DESC LIMIT ' + limit + ' OFFSET ' + offset).all(...params);
+
+    res.json({
+      deposits: rows,
+      total: parseInt(countResult.total),
+      pages: Math.ceil(parseInt(countResult.total) / limit)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ====== ADMIN: ALL NUMBERS ======
+app.get('/api/admin/numbers', requireAdmin, async function(req, res) {
+  try {
+    var status = req.query.status || '';
+    var page = parseInt(req.query.page) || 1;
+    var limit = 20;
+    var offset = (page - 1) * limit;
+
+    var whereClause = status ? "WHERE status = $1" : "";
+    var params = status ? [status] : [];
+
+    var countResult = await db.prepare('SELECT COUNT(*) as total FROM numbers ' + whereClause).get(...params);
+    var rows = await db.prepare('SELECT * FROM numbers ' + whereClause + ' ORDER BY created_at DESC LIMIT ' + limit + ' OFFSET ' + offset).all(...params);
+
+    res.json({
+      numbers: rows,
+      total: parseInt(countResult.total),
+      pages: Math.ceil(parseInt(countResult.total) / limit)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ====== ADMIN: DELETE USER ======
+app.delete('/api/admin/user/:email', requireAdmin, async function(req, res) {
+  try {
+    var email = req.params.email;
+    await db.prepare('DELETE FROM history WHERE email = $1').run(email);
+    await db.prepare('DELETE FROM numbers WHERE email = $1').run(email);
+    await db.prepare('DELETE FROM deposits WHERE email = $1').run(email);
+    await db.prepare('DELETE FROM withdrawals WHERE email = $1').run(email);
+    await db.prepare('DELETE FROM users WHERE email = $1').run(email);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ====== CATCH-ALL ======
 app.use(function(req, res, next) {
   if (req.path.startsWith('/api')) return res.status(404).json({ error: 'API route not found' });

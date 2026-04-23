@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel - SonVerify</title>
+<style>
+:root {
+  --bg: #f5f6fa;
+  --card: #ffffff;
+  --border: #e2e8f0;
+  --text: #1a202c;
+  --text2: #64748b;
+  --accent: #0d9b7a;
+  --accent2: #0b7d63;
+  --danger: #e53e3e;
+  --danger2: #c53030;
+  --warning: #d69e2e;
+  --success: #38a169;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  --radius: 12px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
+
+/* LOGIN */
+.login-screen { display:flex; align-items:center; justify-content:center; min-height:100vh; background:linear-gradient(135deg,#0d9b7a,#0b7d63); }
+.login-box { background:var(--card); border-radius:16px; padding:40px; width:90%; max-width:380px; box-shadow:0 20px 60px rgba(0,0,0,0.2); }
+.login-box h1 { font-size:22px; margin-bottom:6px; }
+.login-box p { color:var(--text2); font-size:13px; margin-bottom:24px; }
+.login-box input { width:100%; padding:12px 14px; border:1px solid var(--border); border-radius:10px; font-size:14px; margin-bottom:16px; outline:none; }
+.login-box input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(13,155,122,0.1); }
+.login-box button { width:100%; padding:12px; background:var(--accent); color:#fff; border:none; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; }
+.login-box button:hover { background:var(--accent2); }
+.login-box button:disabled { opacity:0.6; cursor:not-allowed; }
+.login-error { color:var(--danger); font-size:12px; margin-bottom:12px; display:none; }
+
+/* LAYOUT */
+.app { display:none; }
+.topbar { position:fixed; top:0; left:0; right:0; height:56px; background:var(--card); border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 20px; z-index:100; box-shadow:var(--shadow); }
+.topbar .logo { font-weight:700; font-size:16px; display:flex; align-items:center; gap:8px; }
+.topbar .logo span { color:var(--accent); }
+.topbar .right { margin-left:auto; display:flex; align-items:center; gap:12px; }
+.badge { background:var(--danger); color:#fff; font-size:11px; padding:2px 8px; border-radius:10px; font-weight:600; }
+.btn-logout { padding:6px 14px; background:none; border:1px solid var(--border); border-radius:8px; font-size:12px; cursor:pointer; color:var(--text2); }
+.btn-logout:hover { border-color:var(--danger); color:var(--danger); }
+
+.sidebar { position:fixed; top:56px; left:0; bottom:0; width:220px; background:var(--card); border-right:1px solid var(--border); padding:16px 0; overflow-y:auto; z-index:90; transition:transform 0.3s; }
+.nav-item { display:flex; align-items:center; gap:10px; padding:10px 20px; cursor:pointer; font-size:13px; font-weight:500; color:var(--text2); transition:all 0.15s; border-left:3px solid transparent; }
+.nav-item:hover { background:rgba(13,155,122,0.06); color:var(--text); }
+.nav-item.active { background:rgba(13,155,122,0.1); color:var(--accent); border-left-color:var(--accent); font-weight:600; }
+.nav-item i { width:18px; text-align:center; font-size:14px; }
+.nav-section { font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--text2); padding:16px 20px 6px; font-weight:600; }
+
+.main { margin-left:220px; margin-top:56px; padding:24px; min-height:calc(100vh - 56px); }
+
+/* MOBILE */
+.mobile-toggle { display:none; background:none; border:none; font-size:20px; cursor:pointer; padding:4px; }
+.sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:85; }
+@media(max-width:768px) {
+  .mobile-toggle { display:block; }
+  .sidebar { transform:translateX(-100%); z-index:95; }
+  .sidebar.open { transform:translateX(0); }
+  .sidebar-overlay.open { display:block; }
+  .main { margin-left:0; padding:16px; }
+  .stats-grid { grid-template-columns:1fr 1fr !important; }
+  table { font-size:12px; }
+  .hide-mobile { display:none !important; }
+}
+
+/* STATS */
+.stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+.stat-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); }
+.stat-card .label { font-size:11px; color:var(--text2); text-transform:uppercase; letter-spacing:0.5px; font-weight:600; margin-bottom:6px; }
+.stat-card .value { font-size:26px; font-weight:800; }
+.stat-card .sub { font-size:12px; color:var(--text2); margin-top:4px; }
+.stat-card.green .value { color:var(--accent); }
+.stat-card.red .value { color:var(--danger); }
+.stat-card.yellow .value { color:var(--warning); }
+
+/* TABLES */
+.table-wrap { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; }
+.table-header { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--border); flex-wrap:wrap; gap:10px; }
+.table-header h2 { font-size:16px; font-weight:700; }
+.table-search { padding:8px 12px; border:1px solid var(--border); border-radius:8px; font-size:13px; width:220px; outline:none; }
+.table-search:focus { border-color:var(--accent); }
+.table-filters { display:flex; gap:6px; flex-wrap:wrap; }
+.filter-btn { padding:5px 12px; border:1px solid var(--border); border-radius:6px; background:var(--card); font-size:12px; cursor:pointer; color:var(--text2); }
+.filter-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+table { width:100%; border-collapse:collapse; }
+th { text-align:left; padding:10px 16px; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text2); font-weight:600; background:rgba(0,0,0,0.02); border-bottom:1px solid var(--border); }
+td { padding:10px 16px; border-bottom:1px solid var(--border); font-size:13px; vertical-align:middle; }
+tr:hover td { background:rgba(13,155,122,0.03); }
+.status { display:inline-block; padding:3px 10px; border-radius:6px; font-size:11px; font-weight:600; }
+.status-pending { background:rgba(214,158,46,0.12); color:#b7791f; }
+.status-completed { background:rgba(56,161,105,0.12); color:#276749; }
+.status-failed { background:rgba(229,62,62,0.12); color:#c53030; }
+.status-rejected { background:rgba(229,62,62,0.12); color:#c53030; }
+.status-waiting { background:rgba(66,153,225,0.12); color:#2b6cb0; }
+.status-received { background:rgba(56,161,105,0.12); color:#276749; }
+.status-expired { background:rgba(229,62,62,0.12); color:#c53030; }
+.status-success { background:rgba(56,161,105,0.12); color:#276749; }
+
+.action-btn { padding:4px 10px; border:none; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer; margin-right:4px; }
+.btn-approve { background:rgba(56,161,105,0.12); color:#276749; }
+.btn-approve:hover { background:#276749; color:#fff; }
+.btn-reject { background:rgba(229,62,62,0.12); color:#c53030; }
+.btn-reject:hover { background:#c53030; color:#fff; }
+.btn-view { background:rgba(13,155,122,0.1); color:var(--accent); }
+.btn-view:hover { background:var(--accent); color:#fff; }
+.btn-delete { background:rgba(229,62,62,0.08); color:var(--danger); }
+.btn-delete:hover { background:var(--danger); color:#fff; }
+.btn-add { background:rgba(13,155,122,0.1); color:var(--accent); }
+.btn-add:hover { background:var(--accent); color:#fff; }
+
+.pagination { display:flex; align-items:center; justify-content:center; gap:6px; padding:16px; }
+.page-btn { padding:6px 12px; border:1px solid var(--border); border-radius:6px; background:var(--card); font-size:12px; cursor:pointer; }
+.page-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+.page-btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+/* MODAL */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center; }
+.modal-overlay.show { display:flex; }
+.modal { background:var(--card); border-radius:16px; width:90%; max-width:600px; max-height:85vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.2); }
+.modal-head { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--border); }
+.modal-head h3 { font-size:16px; font-weight:700; }
+.modal-close { background:none; border:none; font-size:18px; cursor:pointer; color:var(--text2); padding:4px; }
+.modal-body { padding:20px; }
+.modal-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px; }
+.modal-row .label { color:var(--text2); }
+.modal-row .val { font-weight:600; text-align:right; }
+.modal-section { font-size:12px; font-weight:700; color:var(--accent); margin:16px 0 8px; text-transform:uppercase; letter-spacing:0.5px; }
+
+/* BALANCE MODAL */
+.balance-form { display:flex; gap:8px; margin-top:12px; }
+.balance-form input { flex:1; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:14px; outline:none; }
+.balance-form select { padding:10px; border:1px solid var(--border); border-radius:8px; font-size:13px; outline:none; }
+
+.empty { text-align:center; padding:40px; color:var(--text2); }
+
+.toast-container { position:fixed; top:70px; right:20px; z-index:300; }
+.toast { padding:12px 20px; border-radius:10px; margin-bottom:8px; font-size:13px; font-weight:500; animation:slideIn 0.3s; box-shadow:0 4px 20px rgba(0,0,0,0.15); }
+.toast-success { background:#276749; color:#fff; }
+.toast-error { background:#c53030; color:#fff; }
+@keyframes slideIn { from { transform:translateX(100%); opacity:0; } to { transform:translateX(0); opacity:1; } }
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-box">
+    <h1>🔒 Admin Panel</h1>
+    <p>SonVerify Management System</p>
+    <div class="login-error" id="loginError">Invalid password</div>
+    <input type="password" id="adminPassword" placeholder="Enter admin password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button onclick="doLogin()" id="loginBtn">Sign In</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="appScreen">
+  <div class="topbar">
+    <button class="mobile-toggle" onclick="toggleSidebar()">☰</button>
+    <div class="logo">Son<span>Verify</span> Admin</div>
+    <div class="right">
+      <span class="badge" id="pendingBadge" style="display:none;">0</span>
+      <button class="btn-logout" onclick="doLogout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+  <div class="sidebar" id="sidebar">
+    <div class="nav-section">Main</div>
+    <div class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard')"><i class="fas fa-chart-pie"></i> Dashboard</div>
+    <div class="nav-section">Management</div>
+    <div class="nav-item" data-page="users" onclick="switchPage('users')"><i class="fas fa-users"></i> Users</div>
+    <div class="nav-item" data-page="withdrawals" onclick="switchPage('withdrawals')"><i class="fas fa-money-bill-transfer"></i> Withdrawals <span class="badge" id="wdBadge" style="margin-left:auto;display:none;">0</span></div>
+    <div class="nav-item" data-page="deposits" onclick="switchPage('deposits')"><i class="fas fa-arrow-down"></i> Deposits</div>
+    <div class="nav-item" data-page="numbers" onclick="switchPage('numbers')"><i class="fas fa-phone"></i> Numbers</div>
+    <div class="nav-section">System</div>
+    <div class="nav-item" data-page="referrals" onclick="switchPage('referrals')"><i class="fas fa-user-group"></i> Referrals</div>
+  </div>
+
+  <div class="main" id="mainContent"></div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- USER DETAIL MODAL -->
+<div class="modal-overlay" id="userModal">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modalTitle">User Detail</h3><button class="modal-close" onclick="closeModal('userModal')">✕</button></div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+var token = '';
+var currentPage = 'dashboard';
+
+function showToast(msg, type) {
+  var c = document.getElementById('toastContainer');
+  var t = document.createElement('div');
+  t.className = 'toast toast-' + type;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(function() { t.remove(); }, 3000);
+}
+
+async function doLogin() {
+  var pw = document.getElementById('adminPassword').value;
+  if (!pw) return;
+  var btn = document.getElementById('loginBtn');
+  btn.disabled = true;
+  btn.textContent = 'Signing in...';
+  try {
+    var res = await fetch('/api/admin/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({password:pw}) });
+    var data = await res.json();
+    if (data.error) {
+      document.getElementById('loginError').style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Sign In';
+    } else {
+      token = 'Bearer admin-' + pw;
+      sessionStorage.setItem('admin_token', token);
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('appScreen').style.display = 'block';
+      loadDashboard();
+    }
+  } catch(e) {
+    document.getElementById('loginError').style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Sign In';
+  }
+}
+
+function doLogout() {
+  token = '';
+  sessionStorage.removeItem('admin_token');
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('appScreen').style.display = 'none';
+  document.getElementById('adminPassword').value = '';
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('open');
+}
+
+async function api(url) {
+  var res = await fetch(url, { headers:{ 'Authorization': token } });
+  if (res.status === 401) { doLogout(); throw new Error('Unauthorized'); }
+  return res.json();
+}
+
+async function apiPost(url, body) {
+  var res = await fetch(url, { method:'POST', headers:{ 'Authorization':token, 'Content-Type':'application/json' }, body:JSON.stringify(body) });
+  if (res.status === 401) { doLogout(); throw new Error('Unauthorized'); }
+  return res.json();
+}
+
+async function apiDelete(url) {
+  var res = await fetch(url, { method:'DELETE', headers:{ 'Authorization':token } });
+  if (res.status === 401) { doLogout(); throw new Error('Unauthorized'); }
+  return res.json();
+}
+
+function switchPage(page) {
+  currentPage = page;
+  document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.toggle('active', n.dataset.page === page); });
+  toggleSidebar();
+  if (page === 'dashboard') loadDashboard();
+  else if (page === 'users') loadUsers();
+  else if (page === 'withdrawals') loadWithdrawals();
+  else if (page === 'deposits') loadDeposits();
+  else if (page === 'numbers') loadNumbers();
+  else if (page === 'referrals') loadReferrals();
+}
+
+function fmtDate(d) { return d ? new Date(d).toLocaleString() : '—'; }
+function fmtMoney(n) { return '$' + parseFloat(n || 0).toFixed(2); }
+function statusClass(s) { return 'status status-' + (s || 'pending'); }
+
+// ====== DASHBOARD ======
+async function loadDashboard() {
+  var main = document.getElementById('mainContent');
+  main.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text2);">Loading...</div>';
+  try {
+    var s = await api('/api/admin/stats');
+    var wd = await api('/api/admin/withdrawals?status=pending');
+
+    // Update badges
+    if (s.pendingWithdrawals > 0) {
+      document.getElementById('pendingBadge').style.display = '';
+      document.getElementById('pendingBadge').textContent = s.pendingWithdrawals;
+      document.getElementById('wdBadge').style.display = '';
+      document.getElementById('wdBadge').textContent = s.pendingWithdrawals;
+    }
+
+    main.innerHTML =
+      '<div class="stats-grid">' +
+        '<div class="stat-card green"><div class="label">Total Users</div><div class="value">' + s.totalUsers + '</div><div class="sub">Registered accounts</div></div>' +
+        '<div class="stat-card"><div class="label">Total Balance</div><div class="value">' + fmtMoney(s.totalBalance) + '</div><div class="sub">Across all users</div></div>' +
+        '<div class="stat-card yellow"><div class="label">Active Numbers</div><div class="value">' + s.activeNumbers + '</div><div class="sub">Waiting / Received</div></div>' +
+        '<div class="stat-card green"><div class="label">Total Deposits</div><div class="value">' + fmtMoney(s.totalDeposits) + '</div><div class="sub">Today: ' + fmtMoney(s.todayDeposits) + '</div></div>' +
+        '<div class="stat-card red"><div class="label">Pending Withdrawals</div><div class="value">' + s.pendingWithdrawals + '</div><div class="sub">Needs attention</div></div>' +
+        '<div class="stat-card green"><div class="label">Referral Commissions</div><div class="value">' + fmtMoney(s.totalCommissions) + '</div><div class="sub">' + s.totalReferrals + ' total referrals</div></div>' +
+      '</div>' +
+      '<div class="table-wrap">' +
+        '<div class="table-header"><h2>⚠️ Pending Withdrawals</h2></div>' +
+        (wd.withdrawals.length === 0 ? '<div class="empty">No pending withdrawals</div>' :
+        '<div style="overflow-x:auto;"><table><thead><tr><th>Email</th><th>Method</th><th>Amount</th><th>Address</th><th>Date</th><th>Actions</th></tr></thead><tbody>' +
+        wd.withdrawals.map(function(w) {
+          return '<tr><td>' + w.email + '</td><td>' + w.method + '</td><td><strong>' + fmtMoney(w.amount) + '</strong></td><td class="hide-mobile" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (w.address || '') + '</td><td>' + fmtDate(w.created_at) + '</td><td>' +
+            '<button class="action-btn btn-approve" onclick="handleWithdrawal(' + w.id + ',\'approve\')">✓ Approve</button>' +
+            '<button class="action-btn btn-reject" onclick="handleWithdrawal(' + w.id + ',\'reject\')">✕ Reject</button>' +
+          '</td></tr>';
+        }).join('') + '</tbody></table></div>') +
+      '</div>';
+  } catch(e) {
+    main.innerHTML = '<div class="empty" style="color:var(--danger);">Error: ' + e.message + '</div>';
+  }
+}
+
+// ====== USERS ======
+var usersPage = 1;
+var usersSearch = '';
+
+async function loadUsers(page) {
+  if (page) usersPage = page;
+  var main = document.getElementById('mainContent');
+  main.innerHTML = '<div class="empty">Loading...</div>';
+  try {
+    var q = usersSearch ? '&search=' + encodeURIComponent(usersSearch) : '';
+    var data = await api('/api/admin/users?page=' + usersPage + q);
+    main.innerHTML =
+      '<div class="table-wrap">' +
+        '<div class="table-header">' +
+          '<h2>Users (' + data.total + ')</h2>' +
+          '<input class="table-search" placeholder="Search email or ref code..." value="' + usersSearch + '" onkeydown="if(event.key===\'Enter\'){usersSearch=this.value;usersPage=1;loadUsers()}">' +
+        '</div>' +
+        '<div style="overflow-x:auto;"><table><thead><tr><th>Email</th><th class="hide-mobile">Ref Code</th><th>Balance</th><th class="hide-mobile">Spent</th><th class="hide-mobile">Referrals</th><th class="hide-mobile">Joined</th><th>Actions</th></tr></thead><tbody>' +
+        data.users.map(function(u) {
+          return '<tr>' +
+            '<td><strong>' + u.email + '</strong></td>' +
+            '<td class="hide-mobile" style="font-family:monospace;font-size:12px;color:var(--accent);">' + (u.referral_code || '—') + '</td>' +
+            '<td><strong>' + fmtMoney(u.balance) + '</strong></td>' +
+            '<td class="hide-mobile">' + fmtMoney(u.total_spent) + '</td>' +
+            '<td class="hide-mobile">' + u.referral_count + '</td>' +
+            '<td class="hide-mobile">' + fmtDate(u.created_at) + '</td>' +
+            '<td><button class="action-btn btn-view" onclick="viewUser(\'' + u.email + '\')">View</button><button class="action-btn btn-add" onclick="openBalanceModal(\'' + u.email + '\',' + u.balance + ')">💰</button></td>' +
+          '</tr>';
+        }).join('') +
+        '</tbody></table></div>' +
+        renderPagination(usersPage, data.pages, 'loadUsers') +
+      '</div>';
+  } catch(e) {
+    main.innerHTML = '<div class="empty" style="color:var(--danger);">Error: ' + e.message + '</div>';
+  }
+}
+
+async function viewUser(email) {
+  document.getElementById('modalTitle').textContent = 'User: ' + email;
+  document.getElementById('modalBody').innerHTML = '<div class="empty">Loading...</div>';
+  document.getElementById('userModal').classList.add('show');
+  try {
+    var data = await api('/api/admin/user/' + encodeURIComponent(email));
+    var h = '<div class="modal-section">Account Info</div>' +
+      '<div class="modal-row"><span class="label">Balance</span><span class="val" style="color:var(--accent);font-size:18px;">' + fmtMoney(data.user.balance) + '</span></div>' +
+      '<div class="modal-row"><span class="label">Referral Code</span><span class="val" style="font-family:monospace;">' + (data.user.referral_code || 'None') + '</span></div>' +
+      '<div class="modal-row"><span class="label">Referred By</span><span class="val">' + (data.user.referred_by || 'None') + '</span></div>' +
+      '<div class="modal-row"><span class="label">Joined</span><span class="val">' + fmtDate(data.user.created_at) + '</span></div>' +
+      '<div class="modal-section">Recent Numbers (' + data.numbers.length + ')</div>';
+
+    if (data.numbers.length === 0) h += '<div style="color:var(--text2);font-size:13px;padding:8px 0;">No numbers</div>';
+    else data.numbers.slice(0, 10).forEach(function(n) {
+      h += '<div class="modal-row"><span class="label">' + (n.service_name || '') + ' — ' + n.phone + '</span><span class="val"><span class="' + statusClass(n.status) + '">' + n.status + '</span> ' + fmtMoney(n.cost) + '</span></div>';
+    });
+
+    h += '<div class="modal-section">Purchase History (' + data.history.length + ')</div>';
+    if (data.history.length === 0) h += '<div style="color:var(--text2);font-size:13px;padding:8px 0;">No history</div>';
+    else data.history.slice(0, 10).forEach(function(hi) {
+      h += '<div class="modal-row"><span class="label">' + (hi.service_name || '') + ' — ' + (hi.phone || '') + '</span><span class="val"><span class="' + statusClass(hi.status) + '">' + hi.status + '</span>' + (hi.code ? ' Code: ' + hi.code : '') + ' ' + fmtMoney(hi.cost) + '</span></div>';
+    });
+
+    h += '<div class="modal-section">Referred Users (' + data.referred_users.length + ')</div>';
+    if (data.referred_users.length === 0) h += '<div style="color:var(--text2);font-size:13px;padding:8px 0;">No referrals</div>';
+    else data.referred_users.forEach(function(r) {
+      h += '<div class="modal-row"><span class="label">' + r.email + '</span><span class="val">' + fmtDate(r.created_at) + '</span></div>';
+    });
+
+    h += '<div style="margin-top:20px;text-align:right;"><button class="action-btn btn-delete" onclick="if(confirm(\'Delete this user permanently?\'))deleteUser(\'' + email + '\')" style="padding:8px 16px;font-size:13px;">🗑️ Delete User</button></div>';
+
+    document.getElementById('modalBody').innerHTML = h;
+  } catch(e) {
+    document.getElementById('modalBody').innerHTML = '<div class="empty" style="color:var(--danger);">Error: ' + e.message + '</div>';
+  }
+}
+
+function openBalanceModal(email, currentBalance) {
+  document.getElementById('modalTitle').textContent = 'Adjust Balance: ' + email;
+  document.getElementById('modalBody').innerHTML =
+    '<p style="font-size:13px;color:var(--text2);margin-bottom:8px;">Current balance: <strong>' + fmtMoney(currentBalance) + '</strong></p>' +
+    '<div class="balance-form">' +
+      '<select id="balAction"><option value="add">Add</option><option value="subtract">Subtract</option><option value="set">Set to</option></select>' +
+      '<input type="number" id="balAmount" placeholder="0.00" step="0.01">' +
+      '<button class="action-btn btn-approve" onclick="adjustBalance(\'' + email + '\')" style="padding:8px 16px;">Apply</button>' +
+    '</div>';
+  document.getElementById('userModal').classList.add('show');
+}
+
+async function adjustBalance(email) {
+  var action = document.getElementById('balAction').value;
+  var amount = parseFloat(document.getElementById('balAmount').value);
+  if (isNaN(amount) || amount < 0) { showToast('Enter valid amount', 'error'); return; }
+  if (action === 'subtract') amount = -amount;
+  if (action === 'set') { amount = amount - (await api('/api/admin/user/' + encodeURIComponent(email))).user.balance; }
+
+  try {
+    var data = await apiPost('/api/admin/user/' + encodeURIComponent(email) + '/balance', { amount: amount, reason: 'Admin adjustment' });
+    showToast('Balance updated to ' + fmtMoney(data.newBalance), 'success');
+    closeModal('userModal');
+    loadUsers();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function deleteUser(email) {
+  try {
+    await apiDelete('/api/admin/user/' + encodeURIComponent(email));
+    showToast('User deleted', 'success');
+    closeModal('userModal');
+    loadUsers();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+// ====== WITHDRAWALS ======
+var wdPage = 1;
+var wdFilter = '';
+
+async function loadWithdrawals(page, status) {
+  if (page) wdPage = page;
+  if (status !== undefined) { wdFilter = status; wdPage = 1; }
+  var main = document.getElementById('mainContent');
+  main.innerHTML = '<div class="empty">Loading...</div>';
+  try {
+    var q = wdFilter ? '&status=' + wdFilter : '';
+    var data = await api('/api/admin/withdrawals?page=' + wdPage + q);
+    main.innerHTML =
+      '<div class="table-wrap">' +
+        '<div class="table-header">' +
+          '<h2>Withdrawals (' + data.total + ')</h2>' +
+          '<div class="table-filters">' +
+            '<button class="filter-btn ' + (wdFilter === '' ? 'active' : '') + '" onclick="loadWithdrawals(1,\'\')">All</button>' +
+            '<button class="filter-btn ' + (wdFilter === 'pending' ? 'active' : '') + '" onclick="loadWithdrawals(1,\'pending\')">Pending</button>' +
+            '<button class="filter-btn ' + (wdFilter === 'completed' ? 'active' : '') + '" onclick="loadWithdrawals(1,\'completed\')">Completed</button>' +
+            '<button class="filter-btn ' + (wdFilter === 'rejected' ? 'active' : '') + '" onclick="loadWithdrawals(1,\'rejected\')">Rejected</button>' +
+          '</div>' +
+        '</div>' +
+        '<div style="overflow-x:auto;"><table><thead><tr><th>Email</th><th>Method</th><th>Amount</th><th class="hide-mobile">Address</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead><tbody>' +
+        data.withdrawals.map(function(w) {
+          return '<tr>' +
+            '<td><strong>' + w.email + '</strong></td>' +
+            '<td>' + w.method + '</td>' +
+            '<td><strong>' + fmtMoney(w.amount) + '</strong></td>' +
+            '<td class="hide-mobile" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (w.address || '') + '</td>' +
+            '<td><span class="' + statusClass(w.status) + '">' + w.status + '</span></td>' +
+            '<td>' + fmtDate(w.created_at) + '</td>' +
+            '<td>' +
+              (w.status === 'pending' ?
+                '<button class="action-btn btn-approve" onclick="handleWithdrawal(' + w.id + ',\'approve\')">✓</button>' +
+                '<button class="action-btn btn-reject" onclick="handleWithdrawal(' + w.id + ',\'reject\')">✕</button>' : '—') +
+            '</td></tr>';
+        }).join('') +
+        '</tbody></table></div>' +
+        renderPagination(wdPage, data.pages, 'loadWithdrawals') +
+      '</div>';
+  } catch(e) {
+    main.innerHTML = '<div class="empty" style="color:var(--danger);">Error: ' + e.message + '</div>';
+  }
+}
+
+async function handleWithdrawal(id, action) {
+  if (!confirm('Are you sure you want to ' + action + ' this withdrawal?')) return;
+  try {
+    var data = await apiPost('/api/admin/withdrawal/' + id, { action: action });
+    showToast('Withdrawal ' + data.status, 'success');
+    loadWithdrawals();
+    loadDashboard();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+// ====== DEPOSITS ======
+var depPage = 1;
+var depFilter = '';
+
+async function loadDeposits(page, status) {
+  if (page) depPage = page;
+  if (status !== undefined) { depFilter = status; depPage = 1; }
+  var main = document.getElementById('mainContent');
+  main.innerHTML = '<div class="empty">Loading...</div>';
+  try {
+    var q = depFilter ? '&status=' + depFilter : '';
+    var data = await api('/api/admin/deposits?page=' + depPage + q);
+    main.innerHTML =
+      '<div class="table-wrap">' +
+        '<div class="table-header">' +
+          '<h2>Deposits (' + data.total + ')</h2>' +
+          '<div class="table-filters">' +
+            '<button class="filter-btn ' + (depFilter === '' ? 'active' : '') + '" onclick="loadDeposits(1,\'\')">All</button>' +
+            '<button class="filter-btn ' + (depFilter === 'pending' ? 'active' : '') + '" onclick="loadDeposits(1,\'pending\')">Pending</button>' +
+            '<button class="filter-btn ' + (depFilter === 'completed' ? 'active' : '') + '" onclick="loadDeposits(1,\'completed\')">Completed</button>' +
+            '<button class="filter-btn ' + (depFilter === 'failed' ? 'active' : '') + '" onclick="loadDeposits(1,\'failed\')">Failed</button>' +
+          '</div>' +
+        '</div>' +
+        '<div style="overflow-x:auto;"><table><thead><tr><th>Email</th><th>Amount</th><th class="hide-mobile">Method</th><th class="hide-mobile">Reference</th><th>Status</th><th>Date</th></tr></thead><tbody>' +
+        data.deposits.map(function(d) {
+          return '<tr>' +
+            '<td><strong>' + d.email + '</strong></td>' +
+            '<td><strong>' + fmtMoney(d.amount) + '</strong></td>' +
+            '<td class="hide-mobile">' + (d.method || d.pay_currency || '') + '</td>' +
+            '<td class="hide-mobile" style="font-family:monospace;font-size:11px;">' + (d.reference || '') + '</td>' +
+            '<td><span class="' + statusClass(d.status) + '">' + d.status + '</span></td>' +
+            '<td>' + fmtDate(d.created_at) + '</td></tr>';
+        }).join('') +
+        '</tbody></table></div>' +
+        renderPagination(depPage, data.pages, 'loadDeposits') +
+      '</div>';
+  } catch(e) {
+    main.innerHTML = '<div class="empty" style="color:var(--danger);">Error: ' + e.message + '</div>';
+  }
+}
+
+// ====== NUMBERS ======
+var numPage = 1;
+var numFilter = '';
+
+async function loadNumbers(page, status) {
+  if (page) numPage = page;
+  if (status !== undefined) { numFilter = status; numPage = 1; }
+  var main = document.getElementById('mainContent');
+  main.innerHTML = '<div class="empty">Loading...</div>';
+  try {
+    var q = numFilter ? '&status=' + numFilter : '';
+    var data = await api('/api/admin/numbers?page=' + numPage + q);
+    main.innerHTML =
+      '<div class="table-wrap">' +
+        '<div class="table-header">' +
+          '<h2>Numbers (' + data.total + ')</h2>' +
+          '<div class="table-filters">' +
+            '<button class="filter-btn ' + (numFilter === '' ? 'active' : '') + '" onclick="loadNumbers(1,\'\')">All</button>' +
+            '<button class="filter-btn ' + (numFilter === 'waiting' ? 'active' : '') + '" onclick="loadNumbers(1,\'waiting\')">Waiting</button>' +
+            '<button class="filter-btn ' + (numFilter === 'received' ? 'active' : '') + '" onclick="loadNumbers(1,\'received\')">Received</button>' +
+            '<button class="filter-btn ' + (numFilter === 'expired' ? 'active' : '') + '" onclick="loadNumbers(1,\'expired\')">Expired</button>' +
+          '</div>' +
+        '</div>' +
+        '<div style="overflow-x:auto;"><table><thead><tr><th>Email</th><th>Service</th><th class="hide-mobile">Phone</th><th class="hide-mobile">Code</th><th>Status</th><th>Cost</th><th class="hide-mobile">Date</th></tr></thead><tbody>' +
+        data.numbers.map(function(n) {
+          return '<tr>' +
+            '<td>' + n.email + '</td>' +
+            '<td>' + (n.service_name || '') + '</td>' +
+            '<td class="hide-mobile" style="font-family:monospace;">' + n.phone + '</td>' +
+            '<td class="hide-mobile" style="font-family:monospace;font-weight:700;color:var(--accent);">' + (n.code || '—') + '</td>' +
+            '<td><span class="' + statusClass(n.status) + '">' + n.status + '</span></td>' +
+            '<td>' + fmtMoney(n.cost) + '</td>' +
+            '<td class="hide-mobile">' + fmtDate(n.created_at) + '</td></tr>';
+        }).join('') +
+        '</tbody></table></div>' +
+        renderPagination(numPage, data.pages, 'loadNumbers') +
+      '</div>';
+  } catch(e) {
+    main.innerHTML = '<div class="empty" style="color:var(--danger);">Error: ' + e.message + '</div>';
+  }
+}
+
+// ====== REFERRALS ======
+async function loadReferrals() {
+  var main = document.getElementById('mainContent');
+  main.innerHTML = '<div class="empty">Loading...</div>';
+  try {
+    var data = await api('/api/admin/users?search=&page=1');
+    var refUsers = data.users.filter(function(u) { return u.referral_count > 0; }).sort(function(a, b) { return b.referral_count - a.referral_count; });
+    main.innerHTML =
+      '<div class="table-wrap">' +
+        '<div class="table-header"><h2>Top Referrers (' + refUsers.length + ' users with referrals)</h2></div>' +
+        (refUsers.length === 0 ? '<div class="empty">No referral activity yet</div>' :
+        '<div style="overflow-x:auto;"><table><thead><tr><th>Rank</th><th>Email</th><th>Ref Code</th><th>Referrals</th><th class="hide-mobile">Total Spent</th><th class="hide-mobile">Est. Commission</th><th>Actions</th></tr></thead><tbody>' +
+        refUsers.map(function(u, i) {
+          var estCommission = u.total_spent * 0.05;
+          return '<tr>' +
+            '<td><strong>#' + (i + 1) + '</strong></td>' +
+            '<td><strong>' + u.email + '</strong></td>' +
+            '<td style="font-family:monospace;font-size:12px;color:var(--accent);">' + (u.referral_code || '') + '</td>' +
+            '<td><strong>' + u.referral_count + '</strong></td>' +
+            '<td class="hide-mobile">' + fmtMoney(u.total_spent) + '</td>' +
+            '<td class="hide-mobile" style="color:var(--accent);font-weight:700;">' + fmtMoney(estCommission) + '</td>' +
+            '<td><button class="action-btn btn-view" onclick="viewUser(\'' + u.email + '\')">View</button></td>' +
+          '</tr>';
+        }).join('') +
+        '</tbody></table></div>') +
+      '</div>';
+  } catch(e) {
+    main.innerHTML = '<div class="empty" style="color:var(--danger);">Error: ' + e.message + '</div>';
+  }
+}
+
+// ====== PAGINATION ======
+function renderPagination(current, total, fn) {
+  if (total <= 1) return '';
+  var html = '<div class="pagination">';
+  html += '<button class="page-btn" ' + (current <= 1 ? 'disabled' : '') + ' onclick="' + fn + '(' + (current - 1) + ')">← Prev</button>';
+  var start = Math.max(1, current - 2);
+  var end = Math.min(total, current + 2);
+  for (var i = start; i <= end; i++) {
+    html += '<button class="page-btn ' + (i === current ? 'active' : '') + '" onclick="' + fn + '(' + i + ')">' + i + '</button>';
+  }
+  html += '<button class="page-btn" ' + (current >= total ? 'disabled' : '') + ' onclick="' + fn + '(' + (current + 1) + ')">Next →</button>';
+  html += '</div>';
+  return html;
+}
+
+// ====== AUTO-LOGIN CHECK ======
+(function() {
+  var saved = sessionStorage.getItem('admin_token');
+  if (saved) {
+    token = saved;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('appScreen').style.display = 'block';
+    loadDashboard();
+  }
+})();
+</script>
+</body>
+</html>
