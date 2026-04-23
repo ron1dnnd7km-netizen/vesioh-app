@@ -1136,9 +1136,9 @@ var depositMethodInfo = {
     note: 'Send USDT via TRC20 network. Do not use ERC20 or BEP20.'
   },
   stripe: {
-    title: 'Bank Cards',
+    title: 'Debit / Credit Cards',              //
     subtitle: 'Confirmation: 1-5 minutes',
-    note: 'Supports Visa, Mastercard and local bank cards.'
+    note: 'Pay securely via Visa, Mastercard, or other supported debit/credit cards.'
   },
   crypto: {
     title: 'Cryptocurrency',
@@ -1208,8 +1208,8 @@ function renderDepositPage(main) {
     '<div style="margin-top:18px;"><button class="btn btn-outline dep-meth" data-method="usdt" onclick="selectPaymentMethod(\'usdt\', this)" style="width:100%;padding:12px;font-size:14px;">Select</button></div>' +
     '</div>' +
     '<div class="stat-card" style="padding:24px;min-height:180px;">' +
-    '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;"><div style="width:44px;height:44px;border-radius:14px;background:rgba(0,175,193,0.1);display:flex;align-items:center;justify-content:center;color:#00afc1;"><i class="fas fa-credit-card" style="font-size:18px;"></i></div><div><div style="font-size:16px;font-weight:700;">Bank Cards</div><div style="font-size:13px;color:var(--text-muted);">Confirmation: 1-5 minutes</div></div></div>' +
-    '<div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">Pay with cards and get balance instantly. Perfect when you need a smooth, simple checkout.</div>' +
+    '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;"><div style="width:44px;height:44px;border-radius:14px;background:rgba(0,175,193,0.1);display:flex;align-items:center;justify-content:center;color:#00afc1;"><i class="fas fa-credit-card" style="font-size:18px;"></i></div><div><div style="font-size:16px;font-weight:700;">Bank Transfer / Cards</div><div style="font-size:13px;color:var(--text-muted);">Confirmation: 1-5 minutes</div></div></div>' +
+    '<div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">Pay securely via Bank Transfer, Visa, Mastercard, or local bank cards.</div>' +
     '<div style="margin-top:18px;"><button class="btn btn-outline dep-meth" data-method="stripe" onclick="selectPaymentMethod(\'stripe\', this)" style="width:100%;padding:12px;font-size:14px;">Select</button></div>' +
     '</div>' +
     '<div class="stat-card" style="padding:24px;min-height:180px;">' +
@@ -1251,9 +1251,21 @@ function updateDepositDetails() {
   var titleEl = document.getElementById('depositMethodTitle');
   var subtitleEl = document.getElementById('depositMethodSubtitle');
   var hintNote = document.getElementById('depositHintNote');
+  var minNote = document.getElementById('cryptoMinNote');
   if (titleEl) titleEl.textContent = 'Top Up By ' + method.title;
   if (subtitleEl) subtitleEl.textContent = method.subtitle;
   if (hintNote) hintNote.textContent = method.note;
+  if (minNote) {
+    if (selectedPaymentMethod === 'usdt') {
+      minNote.textContent = 'Note that the minimum amount for USDT TRC-20 is: US$5';
+    } else if (selectedPaymentMethod === 'crypto' && selectedCryptoCurrency === 'USDT_TRX') {
+      minNote.textContent = 'Note that the minimum amount for USDT TRC-20 is: US$5';
+    } else if (selectedPaymentMethod === 'stripe') {
+      minNote.textContent = 'Note that the minimum amount for card/bank payment is: US$2';
+    } else {
+      minNote.textContent = 'Note that the minimum amount is: US$2';
+    }
+  }
   updatePayButton();
 }
 
@@ -1302,7 +1314,11 @@ function updatePayButton() {
   var btn = document.getElementById('depositPayBtn');
   if (btn) {
     var label = 'Pay';
-    if (selectedPaymentMethod === 'crypto') {
+    if (selectedPaymentMethod === 'stripe') {
+      label = 'Pay with Card';
+    } else if (selectedPaymentMethod === 'usdt') {
+      label = 'Pay with USDT TRC-20';
+    } else if (selectedPaymentMethod === 'crypto') {
       var found = cryptoOptions.find(function(c) { return c.id === selectedCryptoCurrency; });
       label = 'Pay with ' + (found ? found.name : 'Crypto');
     }
@@ -1311,26 +1327,56 @@ function updatePayButton() {
 }
 
 async function processDeposit() {
-  if (selectedCryptoCurrency === 'USDT_TRX' && selectedDepositAmount < 5) {
-    showToast('Minimum for USDT TRC-20 is $5.00', 'error');
-    return;
-  }
-
   if (selectedDepositAmount < 2) {
     showToast('Minimum deposit is $2.00', 'error');
     return;
   }
+
+  if (selectedPaymentMethod === 'usdt' && selectedDepositAmount < 5) {
+    showToast('Minimum for USDT TRC-20 is $5.00', 'error');
+    return;
+  }
+  if (selectedPaymentMethod === 'crypto' && selectedCryptoCurrency === 'USDT_TRX' && selectedDepositAmount < 5) {
+    showToast('Minimum for USDT TRC-20 is $5.00', 'error');
+    return;
+  }
+
   var btn = document.getElementById('depositPayBtn');
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating payment...';
   btn.disabled = true;
 
   try {
-    var endpoint = '/api/deposit/nowpayments';
-    var payload = {
-      email: getUserEmail(),
-      amount: selectedDepositAmount,
-      pay_currency: selectedCryptoCurrency
-    };
+    var endpoint, payload, redirectField;
+
+    if (selectedPaymentMethod === 'stripe') {
+      // ========== FLUTTERWAVE (Bank / Card) ==========
+      endpoint = '/api/deposit/flutterwave';
+      payload = {
+        email: getUserEmail(),
+        amount: selectedDepositAmount
+      };
+      redirectField = 'payment_link';
+
+    } else if (selectedPaymentMethod === 'usdt') {
+      // ========== PLISIO — USDT TRC-20 ==========
+      endpoint = '/api/deposit/plisio';
+      payload = {
+        email: getUserEmail(),
+        amount: selectedDepositAmount,
+        pay_currency: 'USDT_TRX'
+      };
+      redirectField = 'invoice_url';
+
+    } else {
+      // ========== PLISIO — User-picked crypto ==========
+      endpoint = '/api/deposit/plisio';
+      payload = {
+        email: getUserEmail(),
+        amount: selectedDepositAmount,
+        pay_currency: selectedCryptoCurrency
+      };
+      redirectField = 'invoice_url';
+    }
 
     var res = await fetch(endpoint, {
       method: 'POST',
@@ -1338,18 +1384,19 @@ async function processDeposit() {
       body: JSON.stringify(payload)
     });
     var data = await res.json();
+
     if (data.error) {
       showToast(data.error, 'error');
-    } else if (data.invoice_url) {
-      window.location.href = data.invoice_url;
+    } else if (data[redirectField]) {
+      window.location.href = data[redirectField];
     } else {
-      showToast('Unexpected response', 'error');
+      showToast('Unexpected response from payment provider', 'error');
     }
   } catch (err) {
     showToast('Error: ' + err.message, 'error');
   }
 
-  btn.innerHTML = '<i class="fas fa-lock" style="font-size:13px;"></i> Pay $' + selectedDepositAmount.toFixed(2) + ' Securely';
+  updatePayButton();
   btn.disabled = false;
 }
 
@@ -1367,7 +1414,22 @@ async function loadDepositHistory() {
     container.innerHTML = deposits.map(function(d) {
       var statusColor = d.status === 'completed' ? 'var(--accent)' : d.status === 'pending' ? 'var(--warning)' : 'var(--danger)';
       var statusText = d.status === 'completed' ? 'Completed' : d.status === 'pending' ? 'Pending' : 'Failed';
-      var methodLabels = { usdt: 'USDT', btc: 'BTC', eth: 'ETH', ltc: 'LTC', doge: 'DOGE', bnb: 'BNB', sol: 'SOL', xrp: 'XRP', stripe: 'Card', usdc: 'USDC', matic: 'MATIC', ada: 'ADA', trx: 'TRX', usdttrc20: 'USDT TRC20' };
+      var methodLabels = {
+        flutterwave: 'Bank / Card',
+        usdt_trx: 'USDT TRC-20',
+        usdt: 'USDT',
+        btc: 'BTC',
+        eth: 'ETH',
+        ltc: 'LTC',
+        doge: 'DOGE',
+        bnb: 'BNB',
+        sol: 'SOL',
+        xrp: 'XRP',
+        usdc: 'USDC',
+        matic: 'MATIC',
+        ada: 'ADA',
+        trx: 'TRX'
+      };
       var methodLabel = methodLabels[d.method] || methodLabels[d.pay_currency] || d.method || 'Unknown';
       var date = new Date(d.created_at);
       var timeStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

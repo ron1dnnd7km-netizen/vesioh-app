@@ -100,6 +100,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.post('/api/auth/signup', async function(req, res) {
   var email = req.body.email;
   var password = req.body.password;
+  var referralCode = req.body.referral; // <--- GET THE REFERRAL CODE FROM FRONTEND
+
   if (!email || !password) return res.status(400).json({ error: 'All fields are required' });
   if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
   
@@ -107,7 +109,22 @@ app.post('/api/auth/signup', async function(req, res) {
   if (existing) return res.status(400).json({ error: 'Email already registered' });
   
   var hash = bcrypt.hashSync(password, 10);
+  
+  // Insert the new user
   await db.prepare('INSERT INTO users (email, password, balance) VALUES ($1, $2, DEFAULT)').run(email, hash);
+
+  // --- NEW: Track the referral if a code was provided ---
+  if (referralCode) {
+    try {
+      var referrer = await db.prepare('SELECT email FROM users WHERE referral_code = $1').get(referralCode);
+      if (referrer && referrer.email !== email) {
+        await db.prepare('UPDATE users SET referred_by = $1 WHERE email = $2').run(referrer.email, email);
+      }
+    } catch (e) {
+      console.log('Referral tracking skipped:', e.message);
+    }
+  }
+
   res.json({ email: email, message: 'Account created successfully.' });
 });
 
@@ -129,30 +146,25 @@ app.post('/api/auth/forgot-password', function(req, res) {
   res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
 });
 
-// ====== USER (FIXED REFERRAL CODE LOGIC) ======
-// ====== USER (SAFE FOR POSTGRES) ======
+// ====== USER ======
 app.get('/api/user/:email', async function(req, res) {
   try {
     var email = req.params.email;
     var user = await db.prepare('SELECT balance, referral_code FROM users WHERE email = $1').get(email);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // 1. Generate referral code if missing
     var referralCode = user.referral_code;
     if (!referralCode) {
       referralCode = 'REF-' + crypto.randomBytes(3).toString('hex').toUpperCase();
       await db.prepare('UPDATE users SET referral_code = $1 WHERE email = $2').run(referralCode, email);
     }
 
-    // 2. Get referral count
     var countResult = await db.prepare('SELECT COUNT(*) as total FROM users WHERE referred_by = $1').get(email);
     var totalReferrals = countResult ? parseInt(countResult.total) : 0;
 
-    // 3. Calculate total commissions
     var historyResult = await db.prepare("SELECT COALESCE(SUM(cost), 0) as total_spent FROM history WHERE email IN (SELECT email FROM users WHERE referred_by = $1) AND status = 'success'").get(email);
     var totalCommissions = historyResult ? (parseFloat(historyResult.total_spent) * 0.05) : 0;
 
-    // 4. Build referrals array
     var referrals = [];
     try {
       var referredUsers = await db.prepare('SELECT email, created_at FROM users WHERE referred_by = $1 ORDER BY created_at DESC').all(email);
@@ -172,7 +184,6 @@ app.get('/api/user/:email', async function(req, res) {
       console.log('Referrals skipped:', e.message);
     }
 
-    // 5. Get withdrawals array (SAFE - won't crash if table missing)
     var withdrawals = [];
     try {
       var wdRows = await db.prepare('SELECT method, amount, status, created_at FROM withdrawals WHERE email = $1 ORDER BY created_at DESC').all(email);
@@ -188,7 +199,6 @@ app.get('/api/user/:email', async function(req, res) {
       console.log('Withdrawals skipped:', e.message);
     }
 
-    // 6. Return everything
     res.json({
       balance: user.balance,
       refCode: referralCode,
@@ -203,20 +213,15 @@ app.get('/api/user/:email', async function(req, res) {
   }
 });
 
-// POST route to save referral code from frontend (Safety net)
 app.post('/api/user/refcode', async function(req, res) {
   try {
     var { email, refCode } = req.body;
     if (!email || !refCode) return res.status(400).json({ error: 'Missing data' });
-
-    // Only update if they don't have one yet
     var user = await db.prepare('SELECT referral_code FROM users WHERE email = $1').get(email);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    
     if (!user.referral_code) {
       await db.prepare('UPDATE users SET referral_code = $1 WHERE email = $2').run(refCode, email);
     }
-    
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -249,8 +254,87 @@ async function createPlisioInvoice(amount, currency, reference, email) {
   return data.data;
 }
 
-// ====== DEPOSIT: CRYPTO ======
-app.post('/api/deposit/nowpayments', async function(req, res) {
+// ====== DEPOSIT: FLUTTERWAVE (Bank / Card) ======
+app.post('/api/deposit/flutterwave', async function(req, res) {
+  var email = req.body.email;
+  var amount = req.body.amount;
+
+  if (!email || !amount) return res.status(400).json({ error: 'All fields required' });
+  if (amount < 2) return res.status(400).json({ error: 'Minimum deposit is $2.00' });
+  if (amount > 1000) return res.status(400).json({ error: 'Maximum deposit is $1,000.00' });
+
+  var reference = 'DEP-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+  
+  await db.prepare('INSERT INTO deposits (email, amount, method, status, reference) VALUES ($1, $2, $3, $4, $5)').run(email, amount, 'flutterwave', 'pending', reference);
+
+  try {
+    var flutterRes = await fetch('https://api.flutterwave.com/v3/payments', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + process.env.FLUTTERWAVE_SECRET_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        tx_ref: reference,
+        amount: amount * 1500, // Convert USD to NGN (update 1500 to current rate)
+        currency: 'NGN', 
+        payment_options: 'card,account',
+        redirect_url: process.env.FRONTEND_URL + '/?deposit=success',
+        customer: {
+          email: email,
+          name: email.split('@')[0]
+        },
+        customizations: {
+          title: 'SonVerify - Top Up Balance',
+          description: 'Add $' + amount.toFixed(2) + ' to your account'
+        }
+      })
+    });
+
+    var flutterData = await flutterRes.json();
+
+    if (flutterData.status === 'success') {
+      await db.prepare('UPDATE deposits SET reference = $1 WHERE reference = $2').run(flutterData.data.tx_ref, reference);
+      res.json({ payment_link: flutterData.data.link });
+    } else {
+      await db.prepare('UPDATE deposits SET status = $1 WHERE reference = $2').run('failed', reference);
+      res.status(500).json({ error: flutterData.message || 'Flutterwave error' });
+    }
+  } catch (err) {
+    console.error('Flutterwave deposit error:', err.message);
+    await db.prepare('UPDATE deposits SET status = $1 WHERE reference = $2').run('failed', reference);
+    res.status(500).json({ error: 'Payment error: ' + err.message });
+  }
+});
+
+// ====== FLUTTERWAVE WEBHOOK ======
+app.post('/api/webhook/flutterwave', async function(req, res) {
+  try {
+    var secretHash = process.env.FLUTTERWAVE_WEBHOOK_SECRET;
+    var signature = req.headers['verif-hash'];
+    if (signature !== secretHash) return res.status(401).end();
+
+    var payload = req.body;
+    if (payload.event === 'charge.completed' && payload.data.status === 'successful') {
+      var txRef = payload.data.tx_ref;
+      var deposit = await db.prepare('SELECT * FROM deposits WHERE reference = $1 AND status = $2').get(txRef, 'pending');
+
+      if (deposit) {
+        var paidAmount = payload.data.amount;
+        await db.prepare('UPDATE deposits SET status = $1 WHERE reference = $2').run('completed', txRef);
+        await db.prepare('UPDATE users SET balance = balance + $1 WHERE email = $2').run(paidAmount, deposit.email);
+        console.log('Flutterwave credited:', deposit.email, '$' + paidAmount);
+      }
+    }
+    res.status(200).json({ status: 'ok' });
+  } catch (err) {
+    console.error('Flutterwave webhook error:', err.message);
+    res.status(500).end();
+  }
+});
+
+// ====== DEPOSIT: PLISIO (Crypto) ======
+app.post('/api/deposit/plisio', async function(req, res) {
   var email = req.body.email;
   var amount = req.body.amount;
   var payCurrency = req.body.pay_currency || 'TRX';
@@ -265,9 +349,9 @@ app.post('/api/deposit/nowpayments', async function(req, res) {
 
   try {
     var result = await createPlisioInvoice(amount, payCurrency, reference, email);
-    res.json({ success: true, invoice_url: result.invoice_url, reference: reference });
+    res.json({ invoice_url: result.invoice_url, reference: reference });
   } catch (err) {
-    console.error('Crypto deposit error:', err.message);
+    console.error('Plisio deposit error:', err.message);
     await db.prepare('UPDATE deposits SET status = $1 WHERE reference = $2').run('failed', reference);
     res.status(500).json({ error: 'Payment error: ' + err.message });
   }
@@ -519,11 +603,9 @@ app.post('/api/withdraw', async function(req, res) {
       return res.status(400).json({ error: 'Minimum withdrawal is $1.00' });
     }
 
-    // Calculate available commission balance
     var historyResult = await db.prepare("SELECT COALESCE(SUM(cost), 0) as total_spent FROM history WHERE email IN (SELECT email FROM users WHERE referred_by = $1) AND status = 'success'").get(email);
     var totalCommissions = historyResult ? (parseFloat(historyResult.total_spent) * 0.05) : 0;
 
-    // Subtract already withdrawn
     var withdrawnResult = await db.prepare("SELECT COALESCE(SUM(amount), 0) as total FROM withdrawals WHERE email = $1 AND status != 'rejected'").get(email);
     var alreadyWithdrawn = withdrawnResult ? parseFloat(withdrawnResult.total) : 0;
     var available = totalCommissions - alreadyWithdrawn;
@@ -553,7 +635,6 @@ app.post('/api/admin/login', function(req, res) {
   }
 });
 
-// Middleware to check admin session
 function requireAdmin(req, res, next) {
   var token = req.headers['authorization'];
   if (!token || token !== 'Bearer admin-' + ADMIN_PASSWORD) {
@@ -603,7 +684,6 @@ app.get('/api/admin/users', requireAdmin, async function(req, res) {
     var countResult = await db.prepare('SELECT COUNT(*) as total FROM users ' + whereClause).get(...params);
     var users = await db.prepare('SELECT email, balance, referral_code, referred_by, created_at FROM users ' + whereClause + ' ORDER BY created_at DESC LIMIT ' + limit + ' OFFSET ' + offset).all(...params);
 
-    // Get extra stats for each user
     var enriched = [];
     for (var i = 0; i < users.length; i++) {
       var u = users[i];
@@ -707,7 +787,7 @@ app.get('/api/admin/withdrawals', requireAdmin, async function(req, res) {
 app.post('/api/admin/withdrawal/:id', requireAdmin, async function(req, res) {
   try {
     var id = req.params.id;
-    var action = req.body.action; // 'approve' or 'reject'
+    var action = req.body.action;
     var adminNote = req.body.note || '';
 
     if (action !== 'approve' && action !== 'reject') {
