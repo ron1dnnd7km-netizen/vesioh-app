@@ -309,7 +309,7 @@ function renderLanding() {
 
     <!-- FOOTER -->
     <footer style="padding:40px;text-align:center;border-top:1px solid var(--border);margin-top:40px;">
-      <p style="font-size:13px;color:var(--text-muted);">SMS Virtual Code &copy; 2025. All rights reserved.</p>
+      <p style="font-size:13px;color:var(--text-muted);">SonVerify &copy; 2025. All rights reserved.</p>
     </footer>
   `;
 }

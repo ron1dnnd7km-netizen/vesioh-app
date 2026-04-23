@@ -145,7 +145,7 @@ async function createPlisioInvoice(amount, currency, reference, email) {
     source_currency: 'USD',
     source_amount: amount,
     order_number: reference,
-    order_name: 'SMS Virtual Code deposit - ' + email,
+    order_name: 'SonVerify deposit - ' + email,
     currency: (currency || 'TRX').toUpperCase(),
     email: email,
     callback_url: process.env.FRONTEND_URL + '/api/deposit/plisio-callback?json=true',
@@ -257,9 +257,7 @@ app.post('/api/numbers/request', async function(req, res) {
 
   await db.prepare('UPDATE users SET balance = balance - $1 WHERE email = $2').run(cost, email);
   
-  // Using RETURNING id to get the new database ID for Postgres
   var insertResult = await db.prepare('INSERT INTO numbers (email, service_name, service_id, phone, status, time_left, total_time, cost, provider_request_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id').run(email, serviceName, serviceId, realPhone, 'waiting', 600, 600, cost, providerRequestId);
-  
   var numberId = insertResult.rows[0].id;
 
   await db.prepare('INSERT INTO history (email, service_name, phone, code, status, cost) VALUES ($1, $2, $3, NULL, $4, $5)').run(email, serviceName, realPhone, 'pending', cost);
@@ -367,6 +365,56 @@ app.post('/api/simulate/:id', async function(req, res) {
 app.get('/api/deposits/:email', async function(req, res) {
   var rows = await db.prepare('SELECT * FROM deposits WHERE email = $1 ORDER BY created_at DESC').all(req.params.email);
   res.json(rows);
+});
+
+// ====== REFERRAL SYSTEM ======
+app.get('/api/referral/code/:email', async function(req, res) {
+  var user = await db.prepare('SELECT referral_code FROM users WHERE email = $1').get(req.params.email);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  
+  var code = user.referral_code;
+  if (!code) {
+    code = 'REF-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+    await db.prepare('UPDATE users SET referral_code = $1 WHERE email = $2').run(code, req.params.email);
+  }
+  
+  var frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  res.json({ 
+    code: code, 
+    link: frontendUrl + '/?ref=' + code 
+  });
+});
+
+app.post('/api/referral/track', async function(req, res) {
+  var { referrerEmail, referredEmail } = req.body;
+  if (!referrerEmail || !referredEmail) return res.status(400).json({ error: 'Missing data' });
+  if (referrerEmail === referredEmail) return res.status(400).json({ error: 'Cannot refer yourself' });
+
+  var existingRef = await db.prepare('SELECT referred_by FROM users WHERE email = $1').get(referredEmail);
+  if (existingRef && existingRef.referred_by) {
+    return res.json({ message: 'Already tracked' });
+  }
+
+  await db.prepare('UPDATE users SET referred_by = $1 WHERE email = $2').run(referrerEmail, referredEmail);
+  res.json({ success: true });
+});
+
+app.get('/api/referral/stats/:email', async function(req, res) {
+  var email = req.params.email;
+  
+  var countResult = await db.prepare('SELECT COUNT(*) as total FROM users WHERE referred_by = $1').get(email);
+  var totalReferrals = countResult ? countResult.total : 0;
+  
+  var historyResult = await db.prepare("SELECT COALESCE(SUM(cost), 0) as total_spent FROM history WHERE email IN (SELECT email FROM users WHERE referred_by = $1) AND status = 'success'").get(email);
+  var totalEarnings = historyResult ? (historyResult.total_spent * 0.05) : 0;
+  
+  var referredUsers = await db.prepare('SELECT email, created_at FROM users WHERE referred_by = $1 ORDER BY created_at DESC').all(email);
+  
+  res.json({
+    totalReferrals: totalReferrals,
+    totalEarnings: totalEarnings.toFixed(2),
+    list: referredUsers
+  });
 });
 
 // ====== CATCH-ALL ======
