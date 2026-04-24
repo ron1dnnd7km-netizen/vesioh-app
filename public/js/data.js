@@ -111,7 +111,9 @@ const services = [
   // ===== MESSAGING & CHAT =====
   { id: 'vb', name: 'Viber', region: 'United States', country: 'us', icon: 'https://upload.wikimedia.org/wikipedia/commons/5/5d/Viber_logo_2018_%28without_text%29.svg', iconClass: 'viber', price: 0.45, category: 'social' },
   { id: 'kakao', name: 'KakaoTalk', region: 'United States', country: 'us', icon: 'https://upload.wikimedia.org/wikipedia/commons/d/da/Kakao_logo_icon_mmm.png', iconClass: 'kakao', price: 0.50, category: 'social' },
+  { id: 'google', name: 'google/youtube/gmail', region: 'United States', country: 'us', icon: 'https://upload.wikimedia.org/wikipedia/commons/5/52/YouTube_social_white_circle_%282017%29.svg', iconClass: 'google', price: 0.25, category: 'social' },
   { id: 'line', name: 'Line', region: 'United States', country: 'us', icon: 'https://upload.wikimedia.org/wikipedia/commons/6/6d/LINE_logo_icon.png', iconClass: 'line', price: 0.45, category: 'social' },
+  { id: 'apple', name: 'Apple Messages', region: 'United States', country: 'us', icon: 'https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg', iconClass: 'apple', price: 0.45, category: 'social' },
   { id: 'imo', name: 'Imo', region: 'United States', country: 'us', icon: 'https://upload.wikimedia.org/wikipedia/commons/5/53/Imo_icon.png', iconClass: 'imo', price: 0.40, category: 'social' },
   { id: 'icq', name: 'ICQ', region: 'United States', country: 'us', icon: 'https://upload.wikimedia.org/wikipedia/commons/8/89/ICQNewlogo.svg', iconClass: 'icq', price: 0.35, category: 'social' },
   { id: 'sk', name: 'Skype', region: 'United States', country: 'us', icon: 'https://upload.wikimedia.org/wikipedia/commons/6/60/Skype_logo_%282019%E2%80%93present%29.svg', iconClass: 'skype', price: 0.50, category: 'social' },
@@ -279,7 +281,7 @@ const services = [
   { id: 'truecaller', name: 'Truecaller', region: 'United States', country: 'us', icon: 'fas fa-phone', iconClass: 'other', price: 0.45, category: 'popular' },
   { id: 'authy', name: 'Authy', region: 'United States', country: 'us', icon: 'fas fa-shield-alt', iconClass: 'other', price: 0.50, category: 'popular' },
   { id: 'twilio', name: 'Twilio', region: 'United States', country: 'us', icon: 'fas fa-phone', iconClass: 'other', price: 0.55, category: 'popular' },
-  { id: 'gv', name: 'Google Voice', region: 'United States', country: 'us', icon: 'fab fa-google', iconClass: 'other', price: 0.60, category: 'popular' },
+  { id: 'gv', name: 'Google Voice', region: 'United States', country: 'us', icon: 'https://upload.wikimedia.org/wikipedia/commons/archive/b/bf/20201011212440%21Google_Voice_icon_%282020%29.svg', iconClass: 'google', price: 0.60, category: 'popular' },
   { id: 'af', name: 'Affirm', region: 'United States', country: 'us', icon: 'fas fa-credit-card', iconClass: 'other', price: 0.65, category: 'popular' },
   { id: 'chime', name: 'Chime', region: 'United States', country: 'us', icon: 'fas fa-university', iconClass: 'other', price: 0.55, category: 'popular' },
   { id: 'bofa', name: 'Bank of America', region: 'United States', country: 'us', icon: 'fas fa-university', iconClass: 'other', price: 0.70, category: 'popular' },

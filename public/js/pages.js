@@ -1,3 +1,290 @@
+// ===== MISSING HELPER FUNCTIONS =====
+
+// Safe get user email
+window.getUserEmail = function() {
+  try {
+    return localStorage.getItem('sonverify_email') || 
+           localStorage.getItem('userEmail') || 
+           sessionStorage.getItem('userEmail') || '';
+  } catch (e) {
+    return '';
+  }
+};
+
+// Copy number to clipboard
+window.copyNumber = function(phone) {
+  var cleaned = phone.replace(/[^\d+\s-]/g, '');
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(cleaned)
+      .then(function() { showToast('Number copied!', 'success'); })
+      .catch(function() { fallbackCopy(cleaned); });
+  } else {
+    fallbackCopy(cleaned);
+  }
+};
+
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    showToast('Number copied!', 'success');
+  } catch (e) {
+    showToast('Failed to copy', 'error');
+  }
+  document.body.removeChild(ta);
+}
+
+// Cancel number
+window.cancelNumber = function(id) {
+  if (!confirm('Cancel this number and get a refund?')) return;
+  
+  fetch('/api/numbers/' + id, { method: 'DELETE' })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data.error) {
+        showToast(data.error, 'error');
+      } else {
+        showToast(data.message || 'Cancelled!', 'success');
+        if (typeof loadBalance === 'function') loadBalance();
+        if (typeof loadNumbers === 'function') {
+          loadNumbers().then(function() {
+            if (typeof renderMainContent === 'function') renderMainContent();
+          });
+        }
+      }
+    })
+    .catch(function(err) {
+      showToast('Error: ' + err.message, 'error');
+    });
+};
+
+// Toast notification
+window.showToast = function(message, type) {
+  type = type || 'info';
+  var colors = {
+    success: 'var(--accent)',
+    error: 'var(--danger)',
+    warning: 'var(--warning)',
+    info: '#3b82f6'
+  };
+  var icons = {
+    success: 'fa-check-circle',
+    error: 'fa-exclamation-circle',
+    warning: 'fa-exclamation-triangle',
+    info: 'fa-info-circle'
+  };
+  
+  var toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;top:20px;right:20px;z-index:100000;padding:14px 20px;border-radius:12px;background:var(--bg-card);border:1px solid ' + colors[type] + ';box-shadow:0 10px 40px rgba(0,0,0,0.2);display:flex;align-items:center;gap:10px;font-size:14px;max-width:400px;animation:slideInRight 0.3s ease;';
+  toast.innerHTML = '<i class="fas ' + icons[type] + '" style="color:' + colors[type] + ';font-size:16px;"></i><span style="color:var(--text-primary);">' + message + '</span>';
+  
+  if (!document.getElementById('toastAnimationStyle')) {
+    var style = document.createElement('style');
+    style.id = 'toastAnimationStyle';
+    style.textContent = '@keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }';
+    document.head.appendChild(style);
+  }
+  
+  document.body.appendChild(toast);
+  
+  setTimeout(function() {
+    toast.style.transition = 'all 0.3s ease';
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(100%)';
+    setTimeout(function() { toast.remove(); }, 300);
+  }, 3000);
+};
+
+// Price cache for countries
+window.priceCache = window.priceCache || {};
+
+// Fetch prices for a specific country
+window.fetchPricesForCountry = function(countryCode) {
+  if (window.priceCache[countryCode] && Object.keys(window.priceCache[countryCode]).length > 0) {
+    return Promise.resolve(window.priceCache[countryCode]);
+  }
+  
+  return fetch('/api/prices/' + countryCode)
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      window.priceCache[countryCode] = data || {};
+      return window.priceCache[countryCode];
+    })
+    .catch(function(err) {
+      console.error('Price fetch error:', err);
+      return null;
+    });
+};
+
+/* ===== AUTO-VERIFY DEPOSIT ON PAGE LOAD ===== */
+(function() {
+  // Check URL parameters for deposit status
+  var urlParams = new URLSearchParams(window.location.search);
+  var depositStatus = urlParams.get('deposit');
+  var depositRef = urlParams.get('ref');
+  
+  if (depositStatus === 'success' && depositRef) {
+    console.log('Detected return from payment, verifying:', depositRef);
+    
+    // Start polling for deposit status
+    var verifyAttempts = 0;
+    var maxAttempts = 30; // 30 attempts * 3 seconds = 90 seconds max
+    
+    function checkDepositStatus() {
+      verifyAttempts++;
+      
+      fetch('/api/deposit/status/' + depositRef)
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          console.log('Deposit check #' + verifyAttempts + ':', data.status);
+          
+          if (data.status === 'completed') {
+            // SUCCESS! Show notification and refresh balance
+            if (typeof showToast === 'function') {
+              showToast('Payment confirmed! $' + (data.amount || '').toFixed(2) + ' added to your balance.', 'success');
+            } else {
+              alert('Payment confirmed! $' + (data.amount || '').toFixed(2) + ' added to your balance.');
+            }
+            
+            // Update balance display if function exists
+            if (typeof loadBalance === 'function') {
+              loadBalance();
+            }
+            
+            // Refresh deposit history
+            setTimeout(function() {
+              if (typeof loadDepositHistory === 'function') {
+                loadDepositHistory();
+              }
+            }, 1000);
+            
+            // Clean URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            return;
+          }
+          
+          if (data.status === 'failed') {
+            if (typeof showToast === 'function') {
+              showToast('Payment failed. Please try again.', 'error');
+            }
+            window.history.replaceState({}, document.title, window.location.pathname);
+            if (typeof loadDepositHistory === 'function') {
+              loadDepositHistory();
+            }
+            return;
+          }
+          
+          // Still pending - continue polling
+          if (verifyAttempts < maxAttempts) {
+            setTimeout(checkDepositStatus, 3000);
+          } else {
+            if (typeof showToast === 'function') {
+              showToast('Payment is still processing. Your balance will update automatically once confirmed.', 'info');
+            }
+            // Continue background polling less frequently
+            startBackgroundPolling(depositRef);
+          }
+        })
+        .catch(function(err) {
+          console.error('Error checking deposit:', err);
+          if (verifyAttempts < maxAttempts) {
+            setTimeout(checkDepositStatus, 3000);
+          }
+        });
+    }
+    
+    // Start checking after 2 seconds
+    setTimeout(checkDepositStatus, 2000);
+  }
+  
+  if (depositStatus === 'failed') {
+    if (typeof showToast === 'function') {
+      showToast('Payment was cancelled or failed.', 'error');
+    }
+    window.history.replaceState({}, document.title, window.location.pathname);
+    if (typeof loadDepositHistory === 'function') {
+      loadDepositHistory();
+    }
+  }
+})();
+
+// Background polling for pending deposits
+function startBackgroundPolling(reference) {
+  var bgAttempts = 0;
+  var bgMaxAttempts = 60; // 5 more minutes
+  
+  function bgCheck() {
+    bgAttempts++;
+    
+    fetch('/api/deposit/status/' + reference)
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data.status === 'completed') {
+          if (typeof showToast === 'function') {
+            showToast('Payment confirmed! $' + (data.amount || '').toFixed(2) + ' added to your balance.', 'success');
+          }
+          if (typeof loadBalance === 'function') loadBalance();
+          if (typeof loadDepositHistory === 'function') {
+            setTimeout(function() { loadDepositHistory(); }, 500);
+          }
+          return;
+        }
+        
+        if (data.status === 'failed' || bgAttempts >= bgMaxAttempts) {
+          return;
+        }
+        
+        setTimeout(bgCheck, 5000);
+      })
+      .catch(function() {
+        setTimeout(bgCheck, 5000);
+      });
+  }
+  
+  setTimeout(bgCheck, 5000);
+}
+
+/* ===== AUTO-POLL PENDING DEPOSITS ON PAGE LOAD ===== */
+window.startPendingDepositsPolling = function() {
+  var email = (typeof getUserEmail === 'function') ? getUserEmail() : null;
+  if (!email) return;
+  
+  // Check for any pending deposits
+  fetch('/api/deposits/' + email)
+    .then(function(res) { return res.json(); })
+    .then(function(deposits) {
+      var pendingDeposits = deposits.filter(function(d) { return d.status === 'pending'; });
+      
+      if (pendingDeposits.length > 0) {
+        console.log('Found', pendingDeposits.length, 'pending deposit(s), starting polling...');
+        
+        pendingDeposits.forEach(function(deposit) {
+          startBackgroundPolling(deposit.reference);
+        });
+      }
+    })
+    .catch(function(err) {
+      console.log('Could not check pending deposits:', err.message);
+    });
+};
+
+// Call this after login
+var originalLoginCheck = window.checkAuth;
+if (originalLoginCheck) {
+  window.checkAuth = function() {
+    originalLoginCheck().then(function() {
+      setTimeout(function() {
+        window.startPendingDepositsPolling();
+      }, 2000);
+    });
+  };
+}
+
 /* ===== REAL BRAND ICON MAPPER ===== */
 function getServiceIconData(serviceName, serviceId, existingIcon) {
   var name = (serviceName || '').toLowerCase();
@@ -5,17 +292,6 @@ function getServiceIconData(serviceName, serviceId, existingIcon) {
   var icon = (existingIcon || '').trim();
   
   // CHECK IF IT'S A REAL IMAGE URL
-  var isImage = /\.(png|jpg|jpeg|gif|svg|webp)(\?.*)?$/i.test(icon) || icon.indexOf('http') === 0 || icon.indexOf('/') === 0;
-  if (isImage) {
-    return { 
-      html: '<img src="' + icon + '" style="width:100%;height:100%;object-fit:contain;" onerror="this.outerHTML=\'<i class=fas fa-globe></i>\'">', 
-      color: '#374151', 
-      bg: 'rgba(0,0,0,0.04)' 
-    };
-  }
-  
-  // Map of icon class → brand color
-    // CHECK IF IT'S A REAL IMAGE URL
   var isImage = /\.(png|jpg|jpeg|gif|svg|webp)(\?.*)?$/i.test(icon) || icon.indexOf('http') === 0 || icon.indexOf('/') === 0;
   if (isImage) {
     return { 
@@ -937,158 +1213,6 @@ async function renderSettingsPage(main) {
   }
 }
 
-async function renderSettingsPage(main) {
-  
-  // EMPTIED BOTH: Will show empty states until backend provides real data
-  var mockReferrals = []; 
-  var mockWithdrawals = []; 
-
-  var referralHistoryRows = mockReferrals.map(function(r) {
-    return '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;">' +
-      '<div><span style="color:var(--text-muted);">' + r.date + '</span> - ' + r.email + '</div>' +
-      '<div style="font-weight:700;color:var(--accent);">' + r.earned + ' <span style="font-size:10px;color:' + (r.status === 'Paid' ? 'var(--accent)' : 'var(--warning)') + ';">(' + r.status + ')</span></div></div>';
-  }).join('') || '<div style="text-align:center;padding:20px;color:var(--text-muted);">No referrals yet</div>';
-
-  var withdrawalHistoryRows = mockWithdrawals.map(function(w) {
-    return '<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;">' +
-      '<div><span style="color:var(--text-muted);">' + w.date + '</span><br><span style="font-size:11px;">' + w.method + '</span></div>' +
-      '<div style="font-weight:700;color:var(--accent);">' + w.amount + ' <span style="font-size:10px;color:var(--accent);">(' + w.status + ')</span></div></div>';
-  }).join('') || '<div style="text-align:center;padding:20px;color:var(--text-muted);">No withdrawals yet</div>';
-
-  main.innerHTML = 
-    '<div class="page-header"><h1 class="page-title">Referral Program</h1></div>' +
-    
-    '<div style="max-width:980px;margin:0 auto;display:grid;gap:22px;">' +
-      
-      // 1. INTRO & READ MORE
-      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:26px;box-shadow:var(--shadow-sm);">' +
-        '<h2 style="font-size:24px;font-weight:700;margin-bottom:10px;">Recommend the service and earn money</h2>' +
-        '<div id="refDescShort">' +
-          '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin:0;">Share your referral link with friends and earn 5% of every purchase they make.</p>' +
-        '</div>' +
-        '<div id="refDescFull" style="display:none;">' +
-          '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin:0 0 12px 0;">Share your referral link with friends and earn 5% of every purchase made by users who sign up through your link. There is no limit to how much you can earn.</p>' +
-          '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin:0;">The bonus is automatically added to your balance. Share your referral link on social media, chat, or email to grow your earnings. You can withdraw your commissions anytime via Crypto or Gift Cards.</p>' +
-        '</div>' +
-        '<button class="btn btn-secondary" style="margin-top:16px;" id="readMoreBtn" onclick="toggleReadMore()">Read more...</button>' +
-      '</div>' +
-
-      // 2. STATS GRID
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;">' +
-        '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
-          '<div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px;">Total Commissions</div>' +
-          '<div style="font-size:32px;font-weight:800;color:var(--accent);margin-bottom:4px;" id="refTotalCommissions">$0.00</div>' +
-          '<div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">Lifetime earnings</div>' +
-        '</div>' +
-        '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
-          '<div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px;">Referral Count</div>' +
-          '<div style="font-size:32px;font-weight:800;color:var(--text-primary);margin-bottom:4px;" id="refCount">0</div>' +
-          '<div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">Total friends invited</div>' +
-        '</div>' +
-      '</div>' +
-
-      // 3. REFERRAL LINK
-      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
-        '<div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px;">Your REF code</div>' +
-        '<div style="font-size:14px;color:var(--text-primary);line-height:1.6;margin-bottom:16px;word-break:break-all;" id="referralLink">Loading...</div>' +
-        '<button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="copyReferralLink()"><i class="fas fa-copy" style="margin-right:6px;"></i> Copy referral link</button>' +
-      '</div>' +
-
-      // 4. WITHDRAWAL SECTION
-      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
-        '<h3 style="font-size:18px;font-weight:700;margin-bottom:20px;"><i class="fas fa-arrow-right-from-bracket" style="color:var(--accent);margin-right:8px;"></i>Withdraw Commissions</h3>' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">' +
-          '<div>' +
-            '<label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Withdrawal Method</label>' +
-            '<select id="withdrawMethod" class="form-select" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-primary);color:var(--text-primary);font-size:14px;">' +
-              '<option value="">Select method...</option>' +
-              '<option value="crypto">Crypto (USDT, BTC, ETH)</option>' +
-              '<option value="giftcard">Gift Card (Amazon, Apple)</option>' +
-            '</select>' +
-          '</div>' +
-          '<div>' +
-            '<label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Withdraw ($)</label>' +
-            '<input type="number" id="withdrawAmount" class="form-input" placeholder="0.00" min="1" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-primary);color:var(--text-primary);font-size:14px;">' +
-          '</div>' +
-        '</div>' +
-        '<div style="margin-bottom:20px;">' +
-          '<label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Wallet Address / Gift Card Email</label>' +
-          '<input type="text" id="withdrawAddress" class="form-input" placeholder="Enter your wallet address or email" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-primary);color:var(--text-primary);font-size:14px;">' +
-        '</div>' +
-        '<button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;" onclick="requestWithdrawal()"><i class="fas fa-paper-plane" style="margin-right:6px;"></i> Request Withdrawal</button>' +
-      '</div>' +
-
-      // 5. HISTORY TABS
-      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
-        '<div style="display:flex;gap:10px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:10px;">' +
-          '<button id="tabBtnHistory" onclick="switchRefTab(\'history\')" style="flex:1;padding:10px;border-radius:8px;border:none;cursor:pointer;font-weight:600;font-size:14px;background:var(--accent);color:#fff;transition:0.2s;">Referral History</button>' +
-          '<button id="tabBtnWithdrawals" onclick="switchRefTab(\'withdrawals\')" style="flex:1;padding:10px;border-radius:8px;border:none;cursor:pointer;font-weight:600;font-size:14px;background:var(--bg-primary);color:var(--text-secondary);transition:0.2s;">Withdrawal History</button>' +
-        '</div>' +
-        '<div id="refTabHistory">' + referralHistoryRows + '</div>' +
-        '<div id="refTabWithdrawals" style="display:none;">' + withdrawalHistoryRows + '</div>' +
-      '</div>' +
-
-    '</div>';
-
-      // --- FETCH DATA FROM BACKEND & POPULATE ---
-  try {
-    var res = await fetch('/api/user/' + getUserEmail());
-    if (!res.ok) throw new Error('Unable to load referral data');
-    var data = await res.json();
-    
-    // 1. Handle Referral Code (Check both 'refCode' and 'referral_code' just in case)
-    var referralCode = data.refCode || data.referral_code || '';
-    var isEmail = /[@]/.test(referralCode); 
-    
-    // If backend has no code, or mistakenly saved an email, generate a new one
-    if (!referralCode || isEmail) {
-      var newCode = window.generateRefCode(6); 
-      
-      // SAVE IT TO BACKEND and wait for the response!
-      try {
-        var saveRes = await fetch('/api/user/refcode', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: getUserEmail(), refCode: newCode })
-        });
-        
-        var saveData = await saveRes.json();
-        
-        // CRITICAL FIX: ONLY use the new code if the backend actually saved it!
-        if (!saveData.error) {
-          referralCode = newCode; 
-        } else {
-          // If backend failed to save, show error instead of a fake temporary code
-          var linkEl = document.getElementById('referralLink');
-          if (linkEl) linkEl.textContent = 'Error generating code. Contact support.';
-          return; // Stop the function here
-        }
-      } catch(e) { 
-        var linkEl2 = document.getElementById('referralLink');
-        if (linkEl2) linkEl2.textContent = 'Network error.'; 
-        return; // Stop here
-      }
-    }
-    
-    var url = window.location.origin + '/?ref=' + referralCode;
-    var linkElFinal = document.getElementById('referralLink');
-    if (linkElFinal) {
-      linkElFinal.textContent = url;
-      linkElFinal.dataset.link = url;
-    }
-
-    // 2. Populate Stats
-    var commEl = document.getElementById('refTotalCommissions');
-    if (commEl) commEl.textContent = '$' + (data.totalCommissions || data.commissions || 0).toFixed(2);
-
-    var countEl = document.getElementById('refCount');
-    if (countEl) countEl.textContent = (data.referralCount || data.refCount || 0);
-
-  } catch (err) {
-    showToast(err.message, 'error');
-  }
-}
-
 function renderHelpPage(main) {
   main.innerHTML = '<div class="page-header"><h1 class="page-title">Help Center</h1></div>' +
     '<div style="max-width:800px;display:flex;flex-direction:column;gap:16px;">' +
@@ -1136,9 +1260,9 @@ var depositMethodInfo = {
     note: 'Send USDT via TRC20 network. Do not use ERC20 or BEP20.'
   },
   stripe: {
-    title: 'Debit / Credit Cards',              //
+    title: 'Bank Transfer / Card',
     subtitle: 'Confirmation: 1-5 minutes',
-    note: 'Pay securely via Visa, Mastercard, or other supported debit/credit cards.'
+    note: 'Pay via Bank Transfer, Mobile Money, Visa, or Mastercard. Select currency below.'
   },
   crypto: {
     title: 'Cryptocurrency',
@@ -1146,6 +1270,22 @@ var depositMethodInfo = {
     note: 'Pay with BTC, ETH, LTC, DOGE, USDT and more through our secure gateway.'
   }
 };
+
+var bankTransferCurrencies = [
+  { code: 'NGN', name: 'Nigerian Naira (₦)', flag: '🇳🇬' },
+  { code: 'GHS', name: 'Ghana Cedi (₵)', flag: '🇬🇭' },
+  { code: 'KES', name: 'Kenyan Shilling (KSh)', flag: '🇰🇪' },
+  { code: 'ZAR', name: 'South African Rand (R)', flag: '🇿🇦' },
+  { code: 'UGX', name: 'Ugandan Shilling (USh)', flag: '🇺🇬' },
+  { code: 'TZS', name: 'Tanzanian Shilling (TSh)', flag: '🇹🇿' },
+  { code: 'RWF', name: 'Rwandan Franc (FRw)', flag: '🇷🇼' },
+  { code: 'XOF', name: 'West African CFA (CFA)', flag: '🇸🇳' },
+  { code: 'XAF', name: 'Central African CFA (CFA)', flag: '🇨🇲' },
+  { code: 'EGP', name: 'Egyptian Pound (E£)', flag: '🇪🇬' },
+  { code: 'MAD', name: 'Moroccan Dirham (MAD)', flag: '🇲🇦' }
+];
+
+var selectedBankCurrency = 'NGN';
 
 var cryptoOptions = [
   { id: 'USDT_TRX', name: 'USDT TRC-20' },
@@ -1157,6 +1297,49 @@ var cryptoOptions = [
   { id: 'BNB', name: 'BNB Chain' },
   { id: 'SOL', name: 'Solana' }
 ];
+
+function getBankCurrencyPickerHTML() {
+  return '<div id="bankCurrencyPicker" style="margin-bottom:20px;">' +
+    '<label style="display:block;font-size:14px;font-weight:600;margin-bottom:10px;">Select Payment Currency</label>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;">' +
+    bankTransferCurrencies.map(function(c) {
+      var isSelected = c.code === selectedBankCurrency;
+      return '<div class="bank-currency-pick" onclick="selectBankCurrency(\'' + c.code + '\', this)" style="padding:12px 14px;border:1px solid ' + (isSelected ? 'var(--accent)' : 'var(--border)') + ';border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;background:' + (isSelected ? 'var(--accent-dim)' : 'var(--bg-primary)') + ';color:' + (isSelected ? 'var(--accent)' : 'var(--text-secondary)') + ';transition:all 0.2s;display:flex;align-items:center;gap:8px;">' +
+        '<span style="font-size:18px;">' + c.flag + '</span>' + c.name + '</div>';
+    }).join('') +
+    '</div>' +
+    '<div style="margin-top:10px;font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:6px;">' +
+    '<i class="fas fa-shield-alt" style="color:var(--accent);"></i> Bank Transfer & Mobile Money available for African currencies</div>' +
+  '</div>';
+}
+
+window.selectBankCurrency = function(currencyCode, el) {
+  selectedBankCurrency = currencyCode;
+  document.querySelectorAll('.bank-currency-pick').forEach(function(opt) {
+    opt.style.background = 'var(--bg-primary)';
+    opt.style.borderColor = 'var(--border)';
+    opt.style.color = 'var(--text-secondary)';
+  });
+  el.style.background = 'var(--accent-dim)';
+  el.style.borderColor = 'var(--accent)';
+  el.style.color = 'var(--accent)';
+  updateBankAmountPreview();
+};
+
+function updateBankAmountPreview() {
+  var rates = { NGN: 1500, GHS: 15, KES: 150, ZAR: 18, UGX: 3700, TZS: 2500, RWF: 1300, XOF: 600, XAF: 600, EGP: 30, MAD: 10 };
+  var rate = rates[selectedBankCurrency] || 1;
+  var localAmount = Math.round(selectedDepositAmount * rate);
+  
+  var currencySymbols = { NGN: '₦', GHS: '₵', KES: 'KSh', ZAR: 'R', UGX: 'USh', TZS: 'TSh', RWF: 'FRw', XOF: 'CFA', XAF: 'CFA', EGP: 'E£', MAD: 'MAD' };
+  var symbol = currencySymbols[selectedBankCurrency] || '';
+  
+  var previewEl = document.getElementById('bankAmountPreview');
+  if (previewEl) {
+    previewEl.innerHTML = '<i class="fas fa-exchange-alt" style="margin-right:6px;"></i> You will pay: <strong>' + symbol + localAmount.toLocaleString() + ' ' + selectedBankCurrency + '</strong> (≈ $' + selectedDepositAmount.toFixed(2) + ' USD)';
+    previewEl.style.display = 'block';
+  }
+}
 
 function selectCryptoCurrency(currencyId, el) {
   selectedCryptoCurrency = currencyId;
@@ -1198,6 +1381,7 @@ function getCryptoPickerHTML() {
 function renderDepositPage(main) {
   var method = depositMethodInfo[selectedPaymentMethod] || depositMethodInfo.usdt;
   var cryptoPickerBlock = (selectedPaymentMethod === 'crypto') ? getCryptoPickerHTML() : '';
+  var bankCurrencyBlock = (selectedPaymentMethod === 'stripe') ? getBankCurrencyPickerHTML() : '';
 
   main.innerHTML = '<div class="page-header"><div><h1 class="page-title">Top Up Balance</h1><div style="font-size:14px;color:var(--text-secondary);margin-top:8px;">Current balance: <strong id="depositCurrentBalance">$0.00</strong></div></div></div>' +
     '<div style="max-width:980px;display:grid;gap:24px;">' +
@@ -1208,8 +1392,8 @@ function renderDepositPage(main) {
     '<div style="margin-top:18px;"><button class="btn btn-outline dep-meth" data-method="usdt" onclick="selectPaymentMethod(\'usdt\', this)" style="width:100%;padding:12px;font-size:14px;">Select</button></div>' +
     '</div>' +
     '<div class="stat-card" style="padding:24px;min-height:180px;">' +
-    '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;"><div style="width:44px;height:44px;border-radius:14px;background:rgba(0,175,193,0.1);display:flex;align-items:center;justify-content:center;color:#00afc1;"><i class="fas fa-credit-card" style="font-size:18px;"></i></div><div><div style="font-size:16px;font-weight:700;">Bank Transfer / Cards</div><div style="font-size:13px;color:var(--text-muted);">Confirmation: 1-5 minutes</div></div></div>' +
-    '<div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">Pay securely via Bank Transfer, Visa, Mastercard, or local bank cards.</div>' +
+    '<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;"><div style="width:44px;height:44px;border-radius:14px;background:rgba(0,175,193,0.1);display:flex;align-items:center;justify-content:center;color:#00afc1;"><i class="fas fa-university" style="font-size:18px;"></i></div><div><div style="font-size:16px;font-weight:700;">Bank Transfer / Cards</div><div style="font-size:13px;color:var(--text-muted);">Confirmation: 1-5 minutes</div></div></div>' +
+    '<div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">Pay via Bank Transfer, Mobile Money, Visa, or Mastercard for African currencies.</div>' +
     '<div style="margin-top:18px;"><button class="btn btn-outline dep-meth" data-method="stripe" onclick="selectPaymentMethod(\'stripe\', this)" style="width:100%;padding:12px;font-size:14px;">Select</button></div>' +
     '</div>' +
     '<div class="stat-card" style="padding:24px;min-height:180px;">' +
@@ -1228,8 +1412,10 @@ function renderDepositPage(main) {
     '<button class="btn btn-outline dep-amt" data-amount="50" onclick="selectDepositAmount(50,this)" style="padding:12px 18px;font-size:14px;">US$50</button>' +
     '<button class="btn btn-outline dep-amt" data-amount="100" onclick="selectDepositAmount(100,this)" style="padding:12px 18px;font-size:14px;">US$100</button>' +
     '</div></div>' +
+    bankCurrencyBlock +
     cryptoPickerBlock +
-    '<div style="margin-bottom:20px;"><label style="display:block;font-size:14px;font-weight:600;margin-bottom:10px;">Top up amount</label>' +
+    '<div id="bankAmountPreview" style="display:none;padding:14px 18px;background:rgba(13,155,122,0.08);border:1px solid rgba(13,155,122,0.2);border-radius:12px;margin-bottom:20px;font-size:14px;color:var(--accent);"></div>' +
+    '<div style="margin-bottom:20px;"><label style="display:block;font-size:14px;font-weight:600;margin-bottom:10px;">Top up amount (USD)</label>' +
     '<input type="number" id="customAmount" placeholder="US$" min="2" max="1000" style="width:100%;padding:16px;border:1px solid var(--border);border-radius:12px;background:var(--bg-primary);font-size:16px;outline:none;" oninput="selectCustomAmount(this.value)"></div>' +
     '<div style="padding:20px;background:rgba(245,248,250,1);border:1px solid var(--border);border-radius:18px;margin-bottom:24px;">' +
     '<ul style="margin:0;padding:0 0 0 18px;color:var(--text-secondary);font-size:14px;line-height:1.8;">' +
@@ -1243,7 +1429,42 @@ function renderDepositPage(main) {
     '<div id="depositHistoryList"><div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">Loading...</div></div>' +
     '</div>' +
     '</div>';
+  
   updateDepositDetails();
+  initDepositPage();
+  
+  if (selectedPaymentMethod === 'stripe') {
+    setTimeout(function() { updateBankAmountPreview(); }, 100);
+  }
+}
+
+// ===== ADD THIS NEW FUNCTION =====
+function initDepositPage() {
+  // Load current balance
+  var email = (typeof getUserEmail === 'function') ? getUserEmail() : null;
+  if (email) {
+    fetch('/api/user/' + email)
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        var balEl = document.getElementById('depositCurrentBalance');
+        if (balEl && data.balance !== undefined) {
+          balEl.textContent = '$' + parseFloat(data.balance).toFixed(2);
+        }
+      })
+      .catch(function() {});
+    
+    // Load deposit history
+    loadDepositHistory();
+  }
+  
+  // Highlight the currently selected payment method
+  document.querySelectorAll('.dep-meth').forEach(function(btn) {
+    if (btn.dataset.method === selectedPaymentMethod) {
+      btn.style.background = 'var(--accent-dim)';
+      btn.style.border = '2px solid var(--accent)';
+      btn.dataset.sel = '1';
+    }
+  });
 }
 
 function updateDepositDetails() {
@@ -1282,6 +1503,7 @@ function selectDepositAmount(amount, el) {
   el.style.border = '2px solid var(--accent)';
   el.dataset.sel = '1';
   updatePayButton();
+  if (selectedPaymentMethod === 'stripe') updateBankAmountPreview();
 }
 
 function selectCustomAmount(value) {
@@ -1294,6 +1516,7 @@ function selectCustomAmount(value) {
       delete btn.dataset.sel;
     });
     updatePayButton();
+    if (selectedPaymentMethod === 'stripe') updateBankAmountPreview();
   }
 }
 
@@ -1352,7 +1575,8 @@ async function processDeposit() {
       endpoint = '/api/deposit/flutterwave';
       payload = {
         email: getUserEmail(),
-        amount: selectedDepositAmount
+        amount: selectedDepositAmount,
+        currency: selectedBankCurrency
       };
       redirectField = 'payment_link';
 
@@ -1375,7 +1599,6 @@ async function processDeposit() {
       redirectField = 'invoice_url';
     }
 
-    // Show loading overlay while waiting for API response
     showDepositLoadingOverlay();
 
     var res = await fetch(endpoint, {
@@ -1406,15 +1629,24 @@ async function processDeposit() {
 // ===== ADD THESE TWO FUNCTIONS BELOW processDeposit =====
 
 function showDepositLoadingOverlay() {
-  hideDepositLoadingOverlay(); // Remove old ones first
+  hideDepositLoadingOverlay();
   var overlay = document.createElement('div');
   overlay.id = 'depositLoadingOverlay';
-  overlay.style.css = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;';
   overlay.innerHTML = '<div style="background:var(--bg-card);padding:40px 50px;border-radius:20px;text-align:center;max-width:340px;box-shadow:0 20px 60px rgba(0,0,0,0.3);">' +
-    '<div style="width:60px;height:60px;border:4px solid var(--accent);border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 20px;"></div>' +
+    '<div style="width:60px;height:60px;border:4px solid var(--accent);border-top-color:transparent;border-radius:50%;animation:depositSpinner 1s linear infinite;margin:0 auto 20px;"></div>' +
     '<h3 style="color:var(--text-primary);font-size:18px;margin:0 0 10px 0;">Redirecting to Payment...</h3>' +
     '<p style="color:var(--text-secondary);font-size:14px;margin:0;">Please wait, do not close this page.</p>' +
   '</div>';
+  
+  // Add spinner keyframes if not already added
+  if (!document.getElementById('depositSpinnerStyle')) {
+    var style = document.createElement('style');
+    style.id = 'depositSpinnerStyle';
+    style.textContent = '@keyframes depositSpinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }';
+    document.head.appendChild(style);
+  }
+  
   document.body.appendChild(overlay);
 }
 
