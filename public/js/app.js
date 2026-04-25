@@ -128,6 +128,10 @@ async function loadHistory() { if (typeof getUserEmail !== 'function') { window.
 
 function renderMainContent() {
   var main = document.getElementById('mainContent'); if (!main) return;
+  
+  // FIX: Always refresh balance when rendering any page
+  loadBalance().catch(function() {});
+  
   var page = window.currentPage; var functionName = 'render' + page.charAt(0).toUpperCase() + page.slice(1) + 'Page';
   if (typeof window[functionName] === 'function') { try { window[functionName](main); } catch(error) { main.innerHTML = '<div style="padding:20px;background:#ffebee;border:2px solid red;border-radius:12px;color:#c62828;">CRASH: '+error.message+'</div>'; } }
   else { main.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>'+t('Page')+' "'+page+'" '+t('is missing')+'</p></div>'; }
@@ -142,10 +146,86 @@ function setFilter(filter) { window.currentFilter = filter; renderMainContent();
 function refreshAllNumbers() { showToast(t('All numbers refreshed'), 'info'); renderMainContent(); }
 
 var depositPollingInterval = null;
-function checkDepositReturn() { var p = new URLSearchParams(window.location.search); var s = p.get('deposit'); if (s) window.history.replaceState({},'',window.location.pathname); Promise.all([loadBalance(), loadDepositHistory()]).then(function() { if (s==='success') { showToast(t('Payment submitted! Checking status...'), 'info'); startDepositPolling(); } else if (s==='cancel') { showToast(t('Payment was cancelled.'), 'error'); } else { checkForPendingDeposits(); } }); }
+function checkDepositReturn() {
+  var p = new URLSearchParams(window.location.search);
+  var s = p.get('deposit');
+  if (s) window.history.replaceState({}, '', window.location.pathname);
+  
+  Promise.all([loadBalance(), loadDepositHistory()]).then(function() {
+    if (s === 'success') {
+      showToast(t('Payment submitted! Checking status...'), 'info');
+      startDepositPolling();
+    } else if (s === 'cancel') {
+      showToast(t('Payment was cancelled.'), 'error');
+    } else {
+      checkForPendingDeposits();
+    }
+  });
+  
+  // FIX: If returning from payment page, always refresh balance multiple times
+  // The backend may have credited the balance while user was on payment gateway page
+  if (s === 'success' || s === 'failed' || s === 'cancelled' || s === 'declined') {
+    var retryCount = 0;
+    (function keepRefreshingBalance() {
+      retryCount++;
+      if (retryCount > 6) return; // 6 * 5s = 30 seconds of extra balance checks
+      setTimeout(function() {
+        loadBalance();
+        keepRefreshingBalance();
+      }, 5000);
+    })();
+  }
+}
+
 function checkForPendingDeposits() { if (window.depositHistoryData && window.depositHistoryData.length > 0) { if (window.depositHistoryData[0].status === 'pending') startDepositPolling(); } }
-function startDepositPolling() { if (depositPollingInterval) clearInterval(depositPollingInterval); var attempts = 0; depositPollingInterval = setInterval(function() { attempts++; Promise.all([loadBalance(), loadDepositHistory()]).then(function() { if (window.depositHistoryData && window.depositHistoryData.length > 0) { var l = window.depositHistoryData[0]; if (l.status==='completed') { showToast(t('Payment successful! Balance updated.'), 'success'); stopDepositPolling(); if (window.currentPage==='deposit') renderMainContent(); return; } if (l.status==='failed'||l.status==='cancelled') { showToast(t('Payment failed or cancelled.'), 'error'); stopDepositPolling(); if (window.currentPage==='deposit') renderMainContent(); return; } } if (attempts >= 24) { stopDepositPolling(); showToast(t('Payment is still processing. It will update automatically.'), 'info'); } }); }, 5000); }
-function stopDepositPolling() { if (depositPollingInterval) { clearInterval(depositPollingInterval); depositPollingInterval = null; } }
+function startDepositPolling() {
+  if (depositPollingInterval) clearInterval(depositPollingInterval);
+  var attempts = 0;
+  var balanceRetryCount = 0;
+  
+  depositPollingInterval = setInterval(function() {
+    attempts++;
+    Promise.all([loadBalance(), loadDepositHistory()]).then(function() {
+      if (window.depositHistoryData && window.depositHistoryData.length > 0) {
+        var l = window.depositHistoryData[0];
+        
+        if (l.status === 'completed') {
+          showToast(t('Payment successful! Balance updated.'), 'success');
+          stopDepositPolling();
+          
+          // FIX: Keep refreshing balance for 30 more seconds after completed
+          // Backend often marks deposit complete BEFORE actually crediting balance
+          balanceRetryCount++;
+          if (balanceRetryCount <= 6) {
+            loadBalance();
+            return; // Skip stopDepositPolling so we keep checking balance
+          }
+          stopDepositPolling();
+          if (window.currentPage === 'deposit') renderMainContent();
+          return;
+        }
+        
+        if (l.status === 'failed' || l.status === 'cancelled') {
+          showToast(t('Payment failed or cancelled.'), 'error');
+          stopDepositPolling();
+          if (window.currentPage === 'deposit') renderMainContent();
+          return;
+        }
+      }
+      if (attempts >= 24) {
+        stopDepositPolling();
+        showToast(t('Payment is still processing. It will update automatically.'), 'info');
+      }
+    });
+  }, 5000);
+}
+
+function stopDepositPolling() {
+  if (depositPollingInterval) {
+    clearInterval(depositPollingInterval);
+    depositPollingInterval = null;
+  }
+}
 
 window.handleLogout = function() { closeMobileSidebar(); if (typeof logout === 'function') logout(); };
 window.handleDeleteAccount = function() { closeMobileSidebar(); deleteAccount(); };

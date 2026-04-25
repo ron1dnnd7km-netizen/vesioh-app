@@ -209,17 +209,25 @@ function getFlagFromPhone(phone, countryCode, country_code) {
           console.log('Deposit check #' + verifyAttempts + ':', data.status);
           
           if (data.status === 'completed') {
-            // SUCCESS! Show notification and refresh balance
-            if (typeof showToast === 'function') {
-              showToast('Payment confirmed! $' + (data.amount || '').toFixed(2) + ' added to your balance.', 'success');
-            } else {
-              alert('Payment confirmed! $' + (data.amount || '').toFixed(2) + ' added to your balance.');
-            }
-            
-            // Update balance display if function exists
-            if (typeof loadBalance === 'function') {
-              loadBalance();
-            }
+  // SUCCESS! Show notification and refresh balance
+  if (typeof showToast === 'function') {
+    showToast('Payment confirmed! $' + (data.amount || '').toFixed(2) + ' added to your balance.', 'success');
+  }
+  
+  // FIX: Keep refreshing balance for 2 minutes after completion
+  // Backend may update deposit status before updating user balance
+  if (typeof loadBalance === 'function') {
+    loadBalance();
+    var extraPolls = 0;
+    (function keepPolling() {
+      extraPolls++;
+      if (extraPolls > 24) return; // 24 * 5s = 2 min
+      setTimeout(function() {
+        loadBalance();
+        keepPolling();
+      }, 5000);
+    })();
+  }
             
             // Refresh deposit history
             setTimeout(function() {
@@ -287,8 +295,9 @@ function getFlagFromPhone(phone, countryCode, country_code) {
 // Background polling for pending deposits
 function startBackgroundPolling(reference) {
   var bgAttempts = 0;
-  var bgMaxAttempts = 60; // 5 more minutes
-  
+  var bgMaxAttempts = 60;
+  var completedSeenAt = null;
+
   function bgCheck() {
     bgAttempts++;
     
@@ -299,19 +308,39 @@ function startBackgroundPolling(reference) {
           if (typeof showToast === 'function') {
             showToast('Payment confirmed! $' + (data.amount || '').toFixed(2) + ' added to your balance.', 'success');
           }
-          if (typeof loadBalance === 'function') loadBalance();
+          
+          // FIX: Record when completed was first seen
+          if (!completedSeenAt) {
+            completedSeenAt = Date.now();
+            
+            // Immediately refresh balance
+            if (typeof loadBalance === 'function') loadBalance();
+            
+            // Keep refreshing balance every 5 seconds for 2 minutes
+            // This handles backend delay between status update and balance credit
+            var balancePollCount = 0;
+            var balancePollMax = 24; // 24 * 5s = 2 minutes
+            
+            function keepRefreshingBalance() {
+              balancePollCount++;
+              if (balancePollCount > balancePollMax) return;
+              setTimeout(function() {
+                if (typeof loadBalance === 'function') loadBalance();
+                keepRefreshingBalance();
+              }, 5000);
+            }
+            keepRefreshingBalance();
+          }
+          
           if (typeof loadDepositHistory === 'function') {
             setTimeout(function() { loadDepositHistory(); }, 500);
           }
           return;
         }
         
-        // FIX: handle declined/cancelled in background polling too
         if (data.status === 'failed' || data.status === 'declined' || data.status === 'cancelled' || bgAttempts >= bgMaxAttempts) {
           if (data.status === 'failed' || data.status === 'declined' || data.status === 'cancelled') {
-            if (typeof loadDepositHistory === 'function') {
-              loadDepositHistory();
-            }
+            if (typeof loadDepositHistory === 'function') loadDepositHistory();
           }
           return;
         }
