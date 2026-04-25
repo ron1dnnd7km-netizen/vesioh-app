@@ -1248,8 +1248,9 @@ async function renderSettingsPage(main) {
       }
     }
 
-  } catch (err) {
-    showToast(err.message, 'error');
+    } catch (err) {
+    // Silent fail — page already shows default placeholder values
+    console.log('Referral data load error (non-critical):', err.message);
   }
 }
 
