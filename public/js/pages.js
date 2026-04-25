@@ -100,26 +100,91 @@ window.showToast = function(message, type) {
   }, 3000);
 };
 
-// Price cache for countries
-window.priceCache = window.priceCache || {};
+// ===== FIX: GRACE PERIOD TRACKER (4 min silent after code/timeout, then history) =====
+window.gracePeriodTimers = window.gracePeriodTimers || {};
+var GRACE_PERIOD_MS = 240000; // 4 minutes
+var NUMBER_TIMER_CAP = 300; // 5 minutes max display
 
-// Fetch prices for a specific country
-window.fetchPricesForCountry = function(countryCode) {
-  if (window.priceCache[countryCode] && Object.keys(window.priceCache[countryCode]).length > 0) {
-    return Promise.resolve(window.priceCache[countryCode]);
-  }
-  
-  return fetch('/api/prices/' + countryCode)
-    .then(function(res) { return res.json(); })
-    .then(function(data) {
-      window.priceCache[countryCode] = data || {};
-      return window.priceCache[countryCode];
-    })
-    .catch(function(err) {
-      console.error('Price fetch error:', err);
-      return null;
-    });
+window.startGracePeriod = function(numberId) {
+  if (window.gracePeriodTimers[numberId]) return;
+  window.gracePeriodTimers[numberId] = setTimeout(function() {
+    delete window.gracePeriodTimers[numberId];
+    // Silently refresh — number moves from active to history on backend
+    if (typeof loadNumbers === 'function') {
+      loadNumbers().then(function() {
+        if (window.currentPage === 'numbers') renderMainContent();
+      });
+    }
+    if (typeof loadHistory === 'function') {
+      loadHistory().then(function() {
+        if (window.currentPage === 'history') renderMainContent();
+      });
+    }
+  }, GRACE_PERIOD_MS);
 };
+
+window.clearGracePeriod = function(numberId) {
+  if (window.gracePeriodTimers[numberId]) {
+    clearTimeout(window.gracePeriodTimers[numberId]);
+    delete window.gracePeriodTimers[numberId];
+  }
+};
+
+// ===== FIX: CANADIAN AREA CODE DETECTION FOR FLAG =====
+var CANADIAN_AREA_CODES = ['204','226','236','249','250','263','289','306','343','354','365','367','368','382','387','403','416','418','431','437','438','450','474','506','514','519','548','579','581','584','587','600','604','613','639','647','672','683','705','709','742','753','778','780','782','807','819','825','867','873','879','902','905'];
+
+function getFlagFromPhone(phone, countryCode, country_code) {
+  // 1. Check explicit country flag from data
+  if (countryCode) {
+    var cc = countryCode.toLowerCase();
+    var c1 = (typeof countries !== 'undefined') ? countries.find(function(c) { return c.code === cc; }) : null;
+    if (c1) return c1.flag;
+  }
+  if (country_code) {
+    var cc2 = country_code.toLowerCase();
+    var c2 = (typeof countries !== 'undefined') ? countries.find(function(c) { return c.code === cc2; }) : null;
+    if (c2) return c2.flag;
+  }
+  // 2. Detect from phone number
+  if (!phone) return '🌍';
+  var p = phone.replace(/\s/g, '');
+  if (p.charAt(0) === '+') p = p.substring(1);
+  if (p.indexOf('44') === 0) return '🇬🇧';
+  else if (p.indexOf('380') === 0) return '🇺🇦';
+  else if (p.indexOf('971') === 0) return '🇦🇪';
+  else if (p.indexOf('966') === 0) return '🇸🇦';
+  else if (p.indexOf('353') === 0) return '🇮🇪';
+  else if (p.indexOf('81') === 0) return '🇯🇵';
+  else if (p.indexOf('62') === 0) return '🇮🇩';
+  else if (p.indexOf('63') === 0) return '🇵🇭';
+  else if (p.indexOf('84') === 0) return '🇻🇳';
+  else if (p.indexOf('55') === 0) return '🇧🇷';
+  else if (p.indexOf('49') === 0) return '🇩🇪';
+  else if (p.indexOf('33') === 0) return '🇫🇷';
+  else if (p.indexOf('39') === 0) return '🇮🇹';
+  else if (p.indexOf('34') === 0) return '🇪🇸';
+  else if (p.indexOf('61') === 0) return '🇦🇺';
+  else if (p.indexOf('91') === 0) return '🇮🇳';
+  else if (p.indexOf('90') === 0) return '🇹🇷';
+  else if (p.indexOf('31') === 0) return '🇳🇱';
+  else if (p.indexOf('48') === 0) return '🇵🇱';
+  else if (p.indexOf('40') === 0) return '🇷🇴';
+  else if (p.indexOf('43') === 0) return '🇦🇹';
+  else if (p.indexOf('60') === 0) return '🇲🇾';
+  else if (p.indexOf('65') === 0) return '🇸🇬';
+  else if (p.indexOf('7') === 0) return '🇷🇺';
+  // FIX: North American — distinguish Canada vs USA by area code
+  else if (p.indexOf('1') === 0 && p.length >= 4) {
+    var areaCode = p.substring(1, 4);
+    if (CANADIAN_AREA_CODES.indexOf(areaCode) !== -1) return '🇨🇦';
+    return '🇺🇸';
+  }
+  return '🌍';
+}
+
+// ===== FIX: REMOVED duplicate fetchPricesForCountry and priceCache =====
+// The data.js version is used instead — it automatically applies addProfit() markup
+// so prices always reflect your % from the provider with no manual update needed.
 
 /* ===== AUTO-VERIFY DEPOSIT ON PAGE LOAD ===== */
 (function() {
@@ -168,9 +233,12 @@ window.fetchPricesForCountry = function(countryCode) {
             return;
           }
           
-          if (data.status === 'failed') {
+          // FIX: Also handle declined and cancelled statuses
+          if (data.status === 'failed' || data.status === 'declined' || data.status === 'cancelled') {
+            var failMsg = data.status === 'declined' ? 'Payment was declined.' : 
+                         data.status === 'cancelled' ? 'Payment was cancelled.' : 'Payment failed.';
             if (typeof showToast === 'function') {
-              showToast('Payment failed. Please try again.', 'error');
+              showToast(failMsg, 'error');
             }
             window.history.replaceState({}, document.title, window.location.pathname);
             if (typeof loadDepositHistory === 'function') {
@@ -202,9 +270,12 @@ window.fetchPricesForCountry = function(countryCode) {
     setTimeout(checkDepositStatus, 2000);
   }
   
-  if (depositStatus === 'failed') {
+  // FIX: Also handle declined and cancelled on direct URL return
+  if (depositStatus === 'failed' || depositStatus === 'declined' || depositStatus === 'cancelled') {
+    var directMsg = depositStatus === 'declined' ? 'Payment was declined.' : 
+                    depositStatus === 'cancelled' ? 'Payment was cancelled.' : 'Payment failed.';
     if (typeof showToast === 'function') {
-      showToast('Payment was cancelled or failed.', 'error');
+      showToast(directMsg, 'error');
     }
     window.history.replaceState({}, document.title, window.location.pathname);
     if (typeof loadDepositHistory === 'function') {
@@ -235,7 +306,13 @@ function startBackgroundPolling(reference) {
           return;
         }
         
-        if (data.status === 'failed' || bgAttempts >= bgMaxAttempts) {
+        // FIX: handle declined/cancelled in background polling too
+        if (data.status === 'failed' || data.status === 'declined' || data.status === 'cancelled' || bgAttempts >= bgMaxAttempts) {
+          if (data.status === 'failed' || data.status === 'declined' || data.status === 'cancelled') {
+            if (typeof loadDepositHistory === 'function') {
+              loadDepositHistory();
+            }
+          }
           return;
         }
         
@@ -356,7 +433,6 @@ function getServiceIconData(serviceName, serviceId, existingIcon) {
     'chime': 'https://upload.wikimedia.org/wikipedia/commons/d/d8/Chime_logo.svg',
     'nvidia': 'https://upload.wikimedia.org/wikipedia/commons/2/22/Nvidia_logo.svg',
     'badoo': 'https://upload.wikimedia.org/wikipedia/commons/7/7e/Badoo_logo.svg',
-    'vk': 'https://upload.wikimedia.org/wikipedia/commons/f/f7/VKontakte_logo.svg',
     'roblox': 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Roblox_logo.svg',
     'pubg': 'https://upload.wikimedia.org/wikipedia/commons/2/28/PUBG_logo.svg',
     'slack': 'https://upload.wikimedia.org/wikipedia/commons/d/d5/Slack_icon_2019.svg',
@@ -590,12 +666,22 @@ function getServiceIconData(serviceName, serviceId, existingIcon) {
 }
 
 function renderNumbersPage(main) {
-  var activeOnlyNumbers = activeNumbers ? activeNumbers.filter(function(n) { return n.status === 'waiting' || n.status === 'received'; }) : [];
-  var totalActive = activeOnlyNumbers.length;
-  var waitingNumbers = activeNumbers;
+  // FIX: Only show WAITING numbers in active section
+  // Received/expired numbers enter 4-min grace period silently, then move to history
+  var waitingOnlyNumbers = activeNumbers ? activeNumbers.filter(function(n) { return n.status === 'waiting'; }) : [];
+  var totalActive = waitingOnlyNumbers.length;
+
+  // FIX: Start grace period for received/expired numbers (silent 4-min countdown)
+  if (activeNumbers) {
+    activeNumbers.forEach(function(n) {
+      if (n.status === 'received' || n.status === 'expired') {
+        startGracePeriod(n.id);
+      }
+    });
+  }
 
   var activeNumbersHTML = totalActive > 0
-    ? waitingNumbers.map(renderActiveNumberCard).join('')
+    ? waitingOnlyNumbers.map(renderActiveNumberCard).join('')
     : '<div style="padding:22px;border:1px dashed var(--border);border-radius:14px;color:var(--text-secondary);font-size:14px;">No active numbers yet. Buy one from below.</div>';
 
   var mobileSearchHTML = '<div class="mobile-search-wrapper" style="margin-bottom:20px;">' +
@@ -674,7 +760,9 @@ window.filterMobileServices = function(query) {
 
  /* ===== Card for combined Number + Code display ===== */
 function renderActiveNumberCard(n) {
-  var timeLeft = (n.time_left !== undefined && n.time_left !== null) ? n.time_left : (n.timeLeft || 0);
+  // FIX: Cap timer at 5 minutes (300 seconds)
+  var rawTimeLeft = (n.time_left !== undefined && n.time_left !== null) ? n.time_left : (n.timeLeft || 0);
+  var timeLeft = Math.min(rawTimeLeft, NUMBER_TIMER_CAP);
   var serviceName = n.service_name || (n.service ? n.service.name : 'Unknown');
   var minutes = Math.floor(timeLeft / 60);
   var seconds = timeLeft % 60;
@@ -682,49 +770,8 @@ function renderActiveNumberCard(n) {
   var existingIcon = n.service_icon || (n.service ? n.service.icon : '');
   var ico = getServiceIconData(serviceName, n.service_id, existingIcon);
   
-  var countryFlag = '';
-  if (n.country_flag) countryFlag = n.country_flag;
-  if (!countryFlag && n.countryCode) {
-    var cc = n.countryCode.toLowerCase();
-    var c1 = (typeof countries !== 'undefined') ? countries.find(function(c) { return c.code === cc; }) : null;
-    countryFlag = c1 ? c1.flag : '';
-  }
-  if (!countryFlag && n.country_code) {
-    var cc2 = n.country_code.toLowerCase();
-    var c2 = (typeof countries !== 'undefined') ? countries.find(function(c) { return c.code === cc2; }) : null;
-    countryFlag = c2 ? c2.flag : '';
-  }
-  if (!countryFlag && n.phone) {
-    var phone = n.phone.replace(/\s/g, '');
-    if (phone.charAt(0) === '+') phone = phone.substring(1);
-    if (phone.indexOf('44') === 0) countryFlag = '🇬🇧';
-    else if (phone.indexOf('380') === 0) countryFlag = '🇺🇦';
-    else if (phone.indexOf('971') === 0) countryFlag = '🇦🇪';
-    else if (phone.indexOf('966') === 0) countryFlag = '🇸🇦';
-    else if (phone.indexOf('353') === 0) countryFlag = '🇮🇪';
-    else if (phone.indexOf('81') === 0) countryFlag = '🇯🇵';
-    else if (phone.indexOf('62') === 0) countryFlag = '🇮🇩';
-    else if (phone.indexOf('63') === 0) countryFlag = '🇵🇭';
-    else if (phone.indexOf('84') === 0) countryFlag = '🇻🇳';
-    else if (phone.indexOf('55') === 0) countryFlag = '🇧🇷';
-    else if (phone.indexOf('49') === 0) countryFlag = '🇩🇪';
-    else if (phone.indexOf('33') === 0) countryFlag = '🇫🇷';
-    else if (phone.indexOf('39') === 0) countryFlag = '🇮🇹';
-    else if (phone.indexOf('34') === 0) countryFlag = '🇪🇸';
-    else if (phone.indexOf('61') === 0) countryFlag = '🇦🇺';
-    else if (phone.indexOf('91') === 0) countryFlag = '🇮🇳';
-    else if (phone.indexOf('90') === 0) countryFlag = '🇹🇷';
-    else if (phone.indexOf('31') === 0) countryFlag = '🇳🇱';
-    else if (phone.indexOf('48') === 0) countryFlag = '🇵🇱';
-    else if (phone.indexOf('40') === 0) countryFlag = '🇷🇴';
-    else if (phone.indexOf('43') === 0) countryFlag = '🇦🇹';
-    else if (phone.indexOf('60') === 0) countryFlag = '🇲🇾';
-    else if (phone.indexOf('65') === 0) countryFlag = '🇸🇬';
-    else if (phone.indexOf('7') === 0) countryFlag = '🇷🇺';
-    else if (phone.indexOf('1') === 0) countryFlag = '🇺🇸';
-    else countryFlag = '🌍';
-  }
-  if (!countryFlag) countryFlag = '🌍';
+  // FIX: Use getFlagFromPhone for correct Canada detection
+  var countryFlag = n.country_flag || getFlagFromPhone(n.phone, n.countryCode, n.country_code);
   
   var phoneDisplay = (n.phone.charAt(0) !== '+' ? '+' : '') + n.phone;
   var phoneCopy = phoneDisplay;
@@ -739,7 +786,8 @@ function renderActiveNumberCard(n) {
     codeDisplay = '<div style="font-family:JetBrains Mono,monospace;font-size:16px;font-weight:800;color:var(--accent);letter-spacing:3px;margin:0 8px;">' + n.code + '</div>';
   }
 
-  var cancelBtn = (n.status === 'waiting' || n.status === 'received')
+  // FIX: No cancel button needed — only waiting numbers reach here now, but keep as safety
+  var cancelBtn = (n.status === 'waiting')
     ? '<button class="btn-sm cancel" onclick="cancelNumber(' + n.id + ')" style="padding:4px 8px;font-size:11px;background:var(--danger);color:white;border:none;border-radius:6px;cursor:pointer;"><i class="fas fa-times"></i></button>'
     : '';
 
@@ -796,49 +844,8 @@ function renderHistoryPage(main) {
       var existingIcon = service ? service.icon : '';
       var ico = getServiceIconData(h.service_name, h.service_id, existingIcon);
       
-      var countryFlag = '';
-      if (h.country_flag) countryFlag = h.country_flag;
-      if (!countryFlag && h.countryCode) {
-        var cc = h.countryCode.toLowerCase();
-        var c1 = (typeof countries !== 'undefined') ? countries.find(function(c) { return c.code === cc; }) : null;
-        countryFlag = c1 ? c1.flag : '';
-      }
-      if (!countryFlag && h.country_code) {
-        var cc2 = h.country_code.toLowerCase();
-        var c2 = (typeof countries !== 'undefined') ? countries.find(function(c) { return c.code === cc2; }) : null;
-        countryFlag = c2 ? c2.flag : '';
-      }
-      if (!countryFlag && h.phone) {
-        var phone = h.phone.replace(/\s/g, '');
-        if (phone.charAt(0) === '+') phone = phone.substring(1);
-        if (phone.indexOf('44') === 0) countryFlag = '🇬🇧';
-        else if (phone.indexOf('380') === 0) countryFlag = '🇺🇦';
-        else if (phone.indexOf('971') === 0) countryFlag = '🇦🇪';
-        else if (phone.indexOf('966') === 0) countryFlag = '🇸🇦';
-        else if (phone.indexOf('353') === 0) countryFlag = '🇮🇪';
-        else if (phone.indexOf('81') === 0) countryFlag = '🇯🇵';
-        else if (phone.indexOf('62') === 0) countryFlag = '🇮🇩';
-        else if (phone.indexOf('63') === 0) countryFlag = '🇵🇭';
-        else if (phone.indexOf('84') === 0) countryFlag = '🇻🇳';
-        else if (phone.indexOf('55') === 0) countryFlag = '🇧🇷';
-        else if (phone.indexOf('49') === 0) countryFlag = '🇩🇪';
-        else if (phone.indexOf('33') === 0) countryFlag = '🇫🇷';
-        else if (phone.indexOf('39') === 0) countryFlag = '🇮🇹';
-        else if (phone.indexOf('34') === 0) countryFlag = '🇪🇸';
-        else if (phone.indexOf('61') === 0) countryFlag = '🇦🇺';
-        else if (phone.indexOf('91') === 0) countryFlag = '🇮🇳';
-        else if (phone.indexOf('90') === 0) countryFlag = '🇹🇷';
-        else if (phone.indexOf('31') === 0) countryFlag = '🇳🇱';
-        else if (phone.indexOf('48') === 0) countryFlag = '🇵🇱';
-        else if (phone.indexOf('40') === 0) countryFlag = '🇷🇴';
-        else if (phone.indexOf('43') === 0) countryFlag = '🇦🇹';
-        else if (phone.indexOf('60') === 0) countryFlag = '🇲🇾';
-        else if (phone.indexOf('65') === 0) countryFlag = '🇸🇬';
-        else if (phone.indexOf('7') === 0) countryFlag = '🇷🇺';
-        else if (phone.indexOf('1') === 0) countryFlag = '🇺🇸';
-        else countryFlag = '🌍';
-      }
-      if (!countryFlag) countryFlag = '🌍';
+      // FIX: Use getFlagFromPhone for correct Canada flag in history
+      var countryFlag = h.country_flag || getFlagFromPhone(h.phone, h.countryCode, h.country_code);
       
       var phoneDisplay = (h.phone.charAt(0) !== '+' ? '+' : '') + h.phone;
       var phoneCopy = phoneDisplay;
@@ -850,6 +857,10 @@ function renderHistoryPage(main) {
       } else if (h.status === 'pending' || h.status === 'waiting') {
         statusColor = 'var(--warning)';
         statusLabel = 'Waiting';
+      // FIX: Handle cancelled status in history
+      } else if (h.status === 'cancelled') {
+        statusColor = 'var(--text-muted)';
+        statusLabel = 'Cancelled';
       } else {
         statusColor = 'var(--danger)';
         statusLabel = 'Timeout';
@@ -1217,7 +1228,14 @@ function renderHelpPage(main) {
   main.innerHTML = '<div class="page-header"><h1 class="page-title">Help Center</h1></div>' +
     '<div style="max-width:800px;display:flex;flex-direction:column;gap:16px;">' +
     '<h2 style="font-size:18px;font-weight:600;margin-bottom:8px;">Virtual Number Service – User Guide</h2>' +
-    '<p style="font-size:14px;color:var(--text-secondary);line-height:1.6;">Stay updated by joining our Telegram Channel for the latest announcements, updates, and support.</p>' +
+    '<div style="background:linear-gradient(135deg,rgba(13,155,122,0.1),rgba(13,155,122,0.05));border:2px solid var(--accent);border-radius:12px;padding:20px;text-align:center;">' +
+    '<p style="font-size:14px;color:var(--text-secondary);line-height:1.6;margin-bottom:12px;">Stay updated by joining our Telegram Channel for the latest announcements, updates, and support.</p>' +
+    '<a href="https://t.me/SonVerifcode" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;transition:all 0.3s;border:none;cursor:pointer;">' +
+    '<i class="fas fa-paper-plane" style="font-size:16px;"></i>' +
+    'Join Telegram Channel' +
+    '</a>' +
+    '</div>' +
+    '<p style="font-size:14px;color:var(--text-secondary);line-height:1.6;"></p>' +
     '<p style="font-size:14px;color:var(--text-secondary);line-height:1.6;">If your purchased activations are not credited to your balance after payment, simply tap the "Restore Purchases" button in the app. If the issue continues, please contact support and provide a screenshot from your App Store or purchase history, or proof of payment from your bank for quick assistance.</p>' +
     '<p style="font-size:14px;color:var(--text-secondary);line-height:1.6;">Our service is simple and easy to use. First, order a number by selecting the service you need (for example, Tinder, WhatsApp, or any supported platform) and choose your preferred country. Once the number is issued, copy it and paste it into the registration form of the selected service. When the verification SMS is sent, it will appear directly in the app. You can then copy the confirmation code and complete your registration.</p>' +
     '<p style="font-size:14px;color:var(--text-secondary);line-height:1.6;">We offer two types of services. The first is Activations, which are short-term numbers available for approximately 20 minutes. These are ideal for quick verifications and allow you to receive one or more SMS depending on the selected service. The second option is Rent, which provides a number for up to 30 days. With this option, you can receive unlimited SMS, and by selecting "Full Rent," you can receive messages from any service, making it ideal for long-term use.</p>' +
@@ -1668,7 +1686,10 @@ async function loadDepositHistory() {
     window.depositHistoryData = deposits;
     container.innerHTML = deposits.map(function(d) {
       var statusColor = d.status === 'completed' ? 'var(--accent)' : d.status === 'pending' ? 'var(--warning)' : 'var(--danger)';
-      var statusText = d.status === 'completed' ? 'Completed' : d.status === 'pending' ? 'Pending' : 'Failed';
+      // FIX: Show declined and cancelled as distinct statuses
+      var statusText = d.status === 'completed' ? 'Completed' : d.status === 'pending' ? 'Pending' : d.status === 'declined' ? 'Declined' : d.status === 'cancelled' ? 'Cancelled' : 'Failed';
+      if (d.status === 'declined') statusColor = '#e65100';
+      if (d.status === 'cancelled') statusColor = 'var(--text-muted)';
       var methodLabels = {
         flutterwave: 'Bank / Card',
         usdt_trx: 'USDT TRC-20',
@@ -1688,7 +1709,7 @@ async function loadDepositHistory() {
       var methodLabel = methodLabels[d.method] || methodLabels[d.pay_currency] || d.method || 'Unknown';
       var date = new Date(d.created_at);
       var timeStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      var bgColor = d.status === 'completed' ? 'var(--accent-dim)' : d.status === 'pending' ? 'rgba(212,136,6,0.08)' : 'rgba(217,48,37,0.06)';
+      var bgColor = d.status === 'completed' ? 'var(--accent-dim)' : d.status === 'pending' ? 'rgba(212,136,6,0.08)' : d.status === 'cancelled' ? 'rgba(0,0,0,0.04)' : 'rgba(217,48,37,0.06)';
       return '<div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--border);">' +
         '<div style="flex:1;"><div style="font-size:13px;font-weight:600;">$' + d.amount.toFixed(2) + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400;">' + methodLabel + '</span></div>' +
         '<div style="font-size:11px;color:var(--text-muted);">' + timeStr + '</div></div>' +
@@ -1777,7 +1798,9 @@ window.updateModalPrice = function() {
   var buyBtn = document.getElementById('finalBuyBtn');
   if (!priceEl) return;
 
-  var cached = priceCache[countryCode];
+  // FIX: Use priceCache from data.js (already has addProfit applied automatically)
+  // Must check that cache actually has data for this country (not just empty object)
+  var cached = (typeof priceCache !== 'undefined') ? priceCache[countryCode] : null;
   if (cached && Object.keys(cached).length > 0) {
     if (cached[service.id] !== undefined) {
       window.modalRealPrice = cached[service.id];
@@ -1786,6 +1809,7 @@ window.updateModalPrice = function() {
       priceEl.style.color = 'var(--accent)';
       if (buyBtn) { buyBtn.disabled = false; buyBtn.innerHTML = '<i class="fas fa-phone-alt"></i> Get Number'; }
     } else {
+      // Cache has data for this country but NOT this service = truly unavailable
       window.modalServiceAvailable = false;
       priceEl.textContent = 'Not available for this country';
       priceEl.style.color = 'var(--danger)';
@@ -1794,32 +1818,44 @@ window.updateModalPrice = function() {
     return;
   }
 
+  // No cache for this country yet — fetch from provider
+  // data.js fetchPricesForCountry applies addProfit automatically
   priceEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading price...';
   priceEl.style.color = 'var(--text-muted)';
   if (buyBtn) { buyBtn.disabled = true; }
 
-  fetchPricesForCountry(countryCode).then(function(prices) {
-    if (!prices) {
-      window.modalRealPrice = service.price;
-      window.modalServiceAvailable = true;
-      priceEl.textContent = '$' + service.price.toFixed(2);
-      priceEl.style.color = 'var(--accent)';
-      if (buyBtn) { buyBtn.disabled = false; buyBtn.innerHTML = '<i class="fas fa-phone-alt"></i> Get Number'; }
-      return;
-    }
-    if (prices[service.id] !== undefined) {
-      window.modalRealPrice = prices[service.id];
-      window.modalServiceAvailable = true;
-      priceEl.textContent = '$' + prices[service.id].toFixed(2);
-      priceEl.style.color = 'var(--accent)';
-      if (buyBtn) { buyBtn.disabled = false; buyBtn.innerHTML = '<i class="fas fa-phone-alt"></i> Get Number'; }
-    } else {
-      window.modalServiceAvailable = false;
-      priceEl.textContent = 'Not available for this country';
-      priceEl.style.color = 'var(--danger)';
-      if (buyBtn) { buyBtn.disabled = true; buyBtn.innerHTML = '<i class="fas fa-ban"></i> Unavailable'; }
-    }
-  });
+  if (typeof fetchPricesForCountry === 'function') {
+    fetchPricesForCountry(countryCode).then(function(prices) {
+      if (!prices || Object.keys(prices).length === 0) {
+        // API returned nothing for this country — use fallback price
+        window.modalRealPrice = service.price;
+        window.modalServiceAvailable = true;
+        priceEl.textContent = '$' + service.price.toFixed(2);
+        priceEl.style.color = 'var(--accent)';
+        if (buyBtn) { buyBtn.disabled = false; buyBtn.innerHTML = '<i class="fas fa-phone-alt"></i> Get Number'; }
+        return;
+      }
+      if (prices[service.id] !== undefined) {
+        window.modalRealPrice = prices[service.id];
+        window.modalServiceAvailable = true;
+        priceEl.textContent = '$' + prices[service.id].toFixed(2);
+        priceEl.style.color = 'var(--accent)';
+                if (buyBtn) { buyBtn.disabled = false; buyBtn.innerHTML = '<i class="fas fa-phone-alt"></i> Get Number'; }
+      } else {
+        window.modalServiceAvailable = false;
+        priceEl.textContent = 'Not available for this country';
+        priceEl.style.color = 'var(--danger)';
+        if (buyBtn) { buyBtn.disabled = true; buyBtn.innerHTML = '<i class="fas fa-ban"></i> Unavailable'; }
+      }
+    });
+  } else {
+    // fetchPricesForCountry not available (shouldn't happen but safety fallback)
+    window.modalRealPrice = service.price;
+    window.modalServiceAvailable = true;
+    priceEl.textContent = '$' + service.price.toFixed(2);
+    priceEl.style.color = 'var(--accent)';
+    if (buyBtn) { buyBtn.disabled = false; buyBtn.innerHTML = '<i class="fas fa-phone-alt"></i> Get Number'; }
+  }
 };
 
 window.executeBuyNumber = function() {
