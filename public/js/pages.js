@@ -103,7 +103,6 @@ window.showToast = function(message, type) {
 // ===== FIX: GRACE PERIOD TRACKER (4 min silent after code/timeout, then history) =====
 window.gracePeriodTimers = window.gracePeriodTimers || {};
 var GRACE_PERIOD_MS = 240000; // 4 minutes
-var NUMBER_TIMER_CAP = 300; // 5 minutes max display
 
 window.startGracePeriod = function(numberId) {
   if (window.gracePeriodTimers[numberId]) return;
@@ -792,9 +791,40 @@ window.filterMobileServices = function(query) {
 
  /* ===== Card for combined Number + Code display ===== */
 function renderActiveNumberCard(n) {
-  // FIX: Cap timer at 5 minutes (300 seconds)
-  var rawTimeLeft = (n.time_left !== undefined && n.time_left !== null) ? n.time_left : (n.timeLeft || 0);
-  var timeLeft = Math.min(rawTimeLeft, NUMBER_TIMER_CAP);
+  // FIXED: Calculate time from timestamp, not stale time_left
+  var totalTime = n.total_time || n.totalTime || 300;
+  var createdTimestamp = n.created_at;
+  
+  // Handle ALL timestamp formats robustly
+  if (typeof createdTimestamp === 'string') {
+    createdTimestamp = new Date(createdTimestamp).getTime();
+    // If ISO parse failed, try SQLite format "2025-01-15 10:00:00"
+    if (isNaN(createdTimestamp)) {
+      createdTimestamp = new Date(createdTimestamp.replace(' ', 'T') + 'Z').getTime();
+    }
+  } else if (createdTimestamp instanceof Date) {
+    createdTimestamp = createdTimestamp.getTime();
+  } else if (typeof createdTimestamp === 'number') {
+    // If it's a Unix timestamp in seconds (not milliseconds), convert
+    if (createdTimestamp < 10000000000) createdTimestamp *= 1000;
+  } else {
+    createdTimestamp = null;
+  }
+  
+  var timeLeft;
+  if (createdTimestamp && !isNaN(createdTimestamp)) {
+    // Calculate from actual timestamp
+    var elapsedSeconds = Math.floor((Date.now() - createdTimestamp) / 1000);
+    if (elapsedSeconds < 0) elapsedSeconds = 0;
+    timeLeft = totalTime - elapsedSeconds;
+  } else {
+    // Fallback: use time_left from DB (shouldn't happen with Fix 1)
+    timeLeft = (n.time_left !== undefined && n.time_left !== null) ? n.time_left : (n.timeLeft || totalTime);
+  }
+  
+  // Cap at 0 minimum
+  if (timeLeft < 0) timeLeft = 0;
+  
   var serviceName = n.service_name || (n.service ? n.service.name : 'Unknown');
   var minutes = Math.floor(timeLeft / 60);
   var seconds = timeLeft % 60;
@@ -802,9 +832,7 @@ function renderActiveNumberCard(n) {
   var existingIcon = n.service_icon || (n.service ? n.service.icon : '');
   var ico = getServiceIconData(serviceName, n.service_id, existingIcon);
   
-  // FIX: Use getFlagFromPhone for correct Canada detection
   var countryFlag = n.country_flag || getFlagFromPhone(n.phone, n.countryCode, n.country_code);
-  
   var phoneDisplay = (n.phone.charAt(0) !== '+' ? '+' : '') + n.phone;
   var phoneCopy = phoneDisplay;
   
@@ -818,7 +846,6 @@ function renderActiveNumberCard(n) {
     codeDisplay = '<div style="font-family:JetBrains Mono,monospace;font-size:16px;font-weight:800;color:var(--accent);letter-spacing:3px;margin:0 8px;">' + n.code + '</div>';
   }
 
-  // FIX: No cancel button needed — only waiting numbers reach here now, but keep as safety
   var cancelBtn = (n.status === 'waiting')
     ? '<button class="btn-sm cancel" onclick="cancelNumber(' + n.id + ')" style="padding:4px 8px;font-size:11px;background:var(--danger);color:white;border:none;border-radius:6px;cursor:pointer;"><i class="fas fa-times"></i></button>'
     : '';
@@ -834,7 +861,7 @@ function renderActiveNumberCard(n) {
     '</div>' +
     codeDisplay +
     '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">' +
-      '<span style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:600;color:' + statusColor + ';min-width:35px;text-align:right;" id="timer-active-' + n.id + '">' + timerDisplay + '</span>' +
+      '<span style="font-family:JetBrains Mono,monospace;font-size:11px;font-weight:600;color:' + statusColor + ';min-width:35px;text-align:right;" id="timer-active-' + n.id + '" data-total-time="' + totalTime + '" data-created-at="' + (n.created_at || '') + '">' + timerDisplay + '</span>' +
       '<span style="font-size:11px;font-weight:700;color:var(--accent);min-width:30px;text-align:right;">$' + n.cost.toFixed(2) + '</span>' +
       cancelBtn +
     '</div>' +
@@ -1087,12 +1114,12 @@ async function renderSettingsPage(main) {
       // 2. STATS
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;">' +
         '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
-          '<div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px;">Total Commissions</div>' +
+          '<div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:500;margin-bottom:8px;">Total Commissions</div>' +
           '<div style="font-size:32px;font-weight:800;color:var(--accent);margin-bottom:4px;" id="refTotalCommissions">$0.00</div>' +
           '<div style="font-size:13px;color:var(--text-secondary);">Lifetime earnings</div>' +
         '</div>' +
         '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:var(--shadow-sm);">' +
-          '<div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px;">Referral Count</div>' +
+          '<div style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:500;margin-bottom:8px;">Referral Count</div>' +
           '<div style="font-size:32px;font-weight:800;color:var(--text-primary);margin-bottom:4px;" id="refCount">0</div>' +
           '<div style="font-size:13px;color:var(--text-secondary);">Total friends invited</div>' +
         '</div>' +
@@ -1773,13 +1800,12 @@ window.openModalById = function(serviceId) {
   var mi = getServiceIconData(service.name, service.id, service.icon);
 
   var modalHTML = '<div class="modal-overlay show" id="buyModalOverlay" onclick="if(event.target===this)closeBuyModal()">' +
-    '<div class="modal" style="width:440px;">' +
+    '<div class="modal" style="width:440px;max-height:90vh;overflow-y:auto;">' +
       '<div class="modal-header">' +
         '<h2 class="modal-title">Get Virtual Number</h2>' +
         '<button class="modal-close" onclick="closeBuyModal()"><i class="fas fa-times"></i></button>' +
       '</div>' +
       '<div class="modal-body">' +
-        // === REAL IMAGE PREVIEW ===
         '<div class="service-image-preview" id="servicePreview" style="display:' + (service.image ? 'flex' : 'none') + ';">' +
           '<img id="serviceImage" src="' + (service.image || '') + '" alt="' + service.name + '" onerror="this.parentElement.style.display=\'none\'">' +
         '</div>' +
@@ -1792,7 +1818,17 @@ window.openModalById = function(serviceId) {
         '</div>' +
         '<div class="form-group">' +
           '<label class="form-label">Country / Region</label>' +
-          '<select class="form-select" id="countrySelect" onchange="updateModalPrice()">' + countryOptions + '</select>' +
+          '<div style="display:flex;flex-direction:column;gap:8px;">' +
+            '<div style="position:relative;">' +
+              '<i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:13px;pointer-events:none;z-index:2;"></i>' +
+              '<input type="text" id="countrySearch" placeholder="Search country... (e.g. US, GB, GE)" ' +
+                'style="width:100%;padding:10px 12px 10px 36px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;color:var(--text-primary);font-size:14px;font-family:inherit;outline:none;transition:all 0.2s;" ' +
+                'onfocus="this.style.borderColor=\'var(--accent)\';this.style.boxShadow=\'0 0 0 3px var(--accent-dim)\'" ' +
+                'onblur="this.style.borderColor=\'var(--border)\';this.style.boxShadow=\'none\'" ' +
+                'oninput="filterCountries(this.value)">' +
+            '</div>' +
+            '<select class="form-select" id="countrySelect" onchange="updateModalPrice()">' + countryOptions + '</select>' +
+          '</div>' +
         '</div>' +
       '</div>' +
       '<div class="modal-footer">' +
@@ -1807,8 +1843,65 @@ window.openModalById = function(serviceId) {
 
   document.body.insertAdjacentHTML('beforeend', modalHTML);
 
+  var searchInput = document.getElementById('countrySearch');
+  if (searchInput) {
+    searchInput.addEventListener('input', filterCountries);
+  }
+
   updateModalPrice();
 };
+
+function filterCountries(query) {
+  var select = document.getElementById('countrySelect');
+  if (!select) return;
+  
+  var queryLower = query.toLowerCase().trim();
+  var options = select.querySelectorAll('option');
+  var visibleCount = 0;
+  var firstVisible = null;
+  
+  for (var i = 0; i < options.length; i++) {
+    options[i].style.display = 'none';
+  }
+  
+  if (queryLower === '') {
+    for (var i = 0; i < options.length; i++) {
+      options[i].style.display = '';
+      visibleCount++;
+      if (!firstVisible) firstVisible = options[i];
+    }
+  } else {
+    var searchTerms = queryLower.split(/\s+/);
+    
+    for (var i = 0; i < options.length; i++) {
+      var option = options[i];
+      var text = option.textContent.toLowerCase();
+      var value = option.value.toLowerCase();
+      
+      var matches = searchTerms.some(function(term) {
+        return text.indexOf(term) !== -1 || value.indexOf(term) !== -1;
+      });
+      
+      if (matches) {
+        option.style.display = '';
+        visibleCount++;
+        if (!firstVisible) firstVisible = options[i];
+      }
+    }
+  }
+  
+  if (firstVisible) {
+    select.value = firstVisible.value;
+    updateModalPrice();
+  } else if (queryLower !== '') {
+    select.value = '';
+    var priceEl = document.getElementById('modalPriceDisplay');
+    if (priceEl) {
+      priceEl.textContent = 'Select a country';
+      priceEl.style.color = 'var(--text-muted)';
+    }
+  }
+}
 
 window.closeBuyModal = function() {
   var modal = document.getElementById('buyModalOverlay');
@@ -1826,8 +1919,6 @@ window.updateModalPrice = function() {
   var buyBtn = document.getElementById('finalBuyBtn');
   if (!priceEl) return;
 
-  // FIX: Use priceCache from data.js (already has addProfit applied automatically)
-  // Must check that cache actually has data for this country (not just empty object)
   var cached = (typeof priceCache !== 'undefined') ? priceCache[countryCode] : null;
   if (cached && Object.keys(cached).length > 0) {
     if (cached[service.id] !== undefined) {
@@ -1837,7 +1928,6 @@ window.updateModalPrice = function() {
       priceEl.style.color = 'var(--accent)';
       if (buyBtn) { buyBtn.disabled = false; buyBtn.innerHTML = '<i class="fas fa-phone-alt"></i> Get Number'; }
     } else {
-      // Cache has data for this country but NOT this service = truly unavailable
       window.modalServiceAvailable = false;
       priceEl.textContent = 'Not available for this country';
       priceEl.style.color = 'var(--danger)';
@@ -1846,8 +1936,6 @@ window.updateModalPrice = function() {
     return;
   }
 
-  // No cache for this country yet — fetch from provider
-  // data.js fetchPricesForCountry applies addProfit automatically
   priceEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading price...';
   priceEl.style.color = 'var(--text-muted)';
   if (buyBtn) { buyBtn.disabled = true; }
@@ -1855,7 +1943,6 @@ window.updateModalPrice = function() {
   if (typeof fetchPricesForCountry === 'function') {
     fetchPricesForCountry(countryCode).then(function(prices) {
       if (!prices || Object.keys(prices).length === 0) {
-        // API returned nothing for this country — use fallback price
         window.modalRealPrice = service.price;
         window.modalServiceAvailable = true;
         priceEl.textContent = '$' + service.price.toFixed(2);
@@ -1868,7 +1955,7 @@ window.updateModalPrice = function() {
         window.modalServiceAvailable = true;
         priceEl.textContent = '$' + prices[service.id].toFixed(2);
         priceEl.style.color = 'var(--accent)';
-                if (buyBtn) { buyBtn.disabled = false; buyBtn.innerHTML = '<i class="fas fa-phone-alt"></i> Get Number'; }
+        if (buyBtn) { buyBtn.disabled = false; buyBtn.innerHTML = '<i class="fas fa-phone-alt"></i> Get Number'; }
       } else {
         window.modalServiceAvailable = false;
         priceEl.textContent = 'Not available for this country';
@@ -1877,7 +1964,6 @@ window.updateModalPrice = function() {
       }
     });
   } else {
-    // fetchPricesForCountry not available (shouldn't happen but safety fallback)
     window.modalRealPrice = service.price;
     window.modalServiceAvailable = true;
     priceEl.textContent = '$' + service.price.toFixed(2);
@@ -1911,8 +1997,6 @@ window.executeBuyNumber = function() {
   var countryFlag = countryData ? countryData.flag : '🏳️';
   var countryName = countryData ? countryData.name : 'Unknown';
   var serviceIcon = window.selectedBuyService.icon || '';
-
-  console.log("EXECUTING BUY -> Service ID:", serviceCode, "| Country:", countryCode, "| Price:", servicePrice, "| Flag:", countryFlag);
 
   var btn = document.getElementById('finalBuyBtn');
   if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Buying...'; btn.disabled = true; }
@@ -1963,4 +2047,3 @@ window.executeBuyNumber = function() {
     }
   });
 };
-
