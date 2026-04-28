@@ -1079,7 +1079,6 @@ window.loadReferralHistory = async function() {
 };
 
 // ====== REFERRAL PAGE RENDER ======
-
 async function renderSettingsPage(main) {
 
   // Render HTML skeleton FIRST (with empty placeholders)
@@ -1091,10 +1090,10 @@ async function renderSettingsPage(main) {
       '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:26px;box-shadow:var(--shadow-sm);">' +
         '<h2 style="font-size:24px;font-weight:700;margin-bottom:10px;">Recommend the service and earn money</h2>' +
         '<div id="refDescShort">' +
-          '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin:0;">Share your referral link with friends and earn 5% of every purchase they make.</p>' +
+          '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin:0;">Share your referral link with friends and earn 10% of every purchase they make.</p>' +
         '</div>' +
         '<div id="refDescFull" style="display:none;">' +
-          '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin:0 0 12px 0;">Share your referral link with friends and earn 5% of every purchase made by users who sign up through your link. There is no limit to how much you can earn.</p>' +
+          '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin:0 0 12px 0;">Share your referral link with friends and earn 10% of every purchase made by users who sign up through your link. There is no limit to how much you can earn.</p>' +
           '<p style="font-size:15px;color:var(--text-secondary);line-height:1.8;margin:0;">The bonus is automatically added to your balance. Share your referral link on social media, chat, or email to grow your earnings. You can withdraw your commissions anytime via Crypto or Gift Cards.</p>' +
         '</div>' +
         '<button class="btn btn-secondary" style="margin-top:16px;" id="readMoreBtn" onclick="toggleReadMore()">Read more...</button>' +
@@ -1158,10 +1157,22 @@ async function renderSettingsPage(main) {
     '</div>';
 
   // --- NOW FETCH REAL DATA FROM BACKEND ---
+  var userEmail = getUserEmail();
+  if (!userEmail) {
+    console.log('Referral page: No user email found');
+    var linkEl = document.getElementById('referralLink');
+    if (linkEl) linkEl.textContent = 'Please log in to see your referral link';
+    return;
+  }
+
   try {
-    var res = await fetch('/api/user/' + getUserEmail());
-    if (!res.ok) throw new Error('Unable to load referral data');
+    console.log('Fetching referral data for:', userEmail);
+    var res = await fetch('/api/user/' + userEmail);
+    if (!res.ok) {
+      throw new Error('Server returned ' + res.status);
+    }
     var data = await res.json();
+    console.log('Referral data received:', data);
 
     // 1. Handle referral code
     var referralCode = data.refCode || data.referral_code || '';
@@ -1174,21 +1185,21 @@ async function renderSettingsPage(main) {
         var saveRes = await fetch('/api/user/refcode', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: getUserEmail(), refCode: newCode })
+          body: JSON.stringify({ email: userEmail, refCode: newCode })
         });
         var saveData = await saveRes.json();
 
         if (!saveData.error) {
           referralCode = newCode;
         } else {
-          var linkEl = document.getElementById('referralLink');
-          if (linkEl) linkEl.textContent = 'Error generating code. Contact support.';
-          return;
+          console.error('Failed to save referral code:', saveData.error);
+          // FIX: Don't return early - use a fallback code for display
+          referralCode = newCode;
         }
       } catch (e) {
-        var linkEl2 = document.getElementById('referralLink');
-        if (linkEl2) linkEl2.textContent = 'Network error.';
-        return;
+        console.error('Network error saving referral code:', e.message);
+        // FIX: Don't return early - use a fallback code for display
+        referralCode = newCode;
       }
     }
 
@@ -1248,9 +1259,17 @@ async function renderSettingsPage(main) {
       }
     }
 
-    } catch (err) {
-    // Silent fail — page already shows default placeholder values
-    console.log('Referral data load error (non-critical):', err.message);
+  } catch (err) {
+    console.error('Referral data load error:', err.message);
+    // Show error in the UI but don't break the page
+    var linkElErr = document.getElementById('referralLink');
+    if (linkElErr) linkElErr.textContent = 'Error loading data. Please refresh the page.';
+    
+    var histErr = document.getElementById('refTabHistory');
+    if (histErr) histErr.innerHTML = '<div style="text-align:center;padding:20px;color:var(--danger);">Failed to load data: ' + err.message + '</div>';
+    
+    var withdErr = document.getElementById('refTabWithdrawals');
+    if (withdErr) withdErr.innerHTML = '<div style="text-align:center;padding:20px;color:var(--danger);">Failed to load data</div>';
   }
 }
 

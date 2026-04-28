@@ -216,6 +216,9 @@ async function createPlisioInvoice(amount, currency, reference, email) {
   var apiKey = process.env.PLISIO_SECRET_KEY;
   if (!apiKey) throw new Error('Plisio API key not configured in .env');
 
+  // Use backend URL for callbacks (Plisio sends to your server, not user's browser)
+  var backendUrl = process.env.BACKEND_URL || process.env.FRONTEND_URL;
+
   var params = new URLSearchParams({
     source_currency: 'USD',
     source_amount: amount,
@@ -223,7 +226,8 @@ async function createPlisioInvoice(amount, currency, reference, email) {
     order_name: 'SonVerify deposit - ' + email,
     currency: (currency || 'TRX').toUpperCase(),
     email: email,
-    callback_url: process.env.FRONTEND_URL + '/api/deposit/plisio-callback?json=true',
+    callback_url: backendUrl + '/api/deposit/plisio-callback?json=true',
+    // These URLs are correct - user is redirected here after payment
     success_invoice_url: process.env.FRONTEND_URL + '/?deposit=success&ref=' + reference,
     fail_invoice_url: process.env.FRONTEND_URL + '/?deposit=failed&ref=' + reference,
     api_key: apiKey
@@ -232,7 +236,7 @@ async function createPlisioInvoice(amount, currency, reference, email) {
   var response = await fetch('https://api.plisio.net/api/v1/invoices/new?' + params.toString(), { method: 'GET' });
   var data = await response.json();
 
-  if (data.status !== 'success') throw new Error(data.data.message || 'Plisio error');
+  if (data.status !== 'success') throw new Error(data.data?.message || 'Plisio error: ' + JSON.stringify(data));
   if (!data.data.invoice_url) throw new Error('No invoice URL returned from Plisio');
   return data.data;
 }

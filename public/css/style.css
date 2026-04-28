@@ -20,8 +20,8 @@
   --accent-dim: rgba(13,155,122,0.08);
   --accent-glow: rgba(13,155,122,0.15);
   --text-primary: #1a1c1e;
-  --text-secondary: #656b71;
-  --text-muted: #a4aaae;
+  --text-secondary: #797880;
+  --text-muted: #c5ccd1;
   --danger: #d93025;
   --warning: #d48806;
   --success: #0d9b7a;
@@ -43,8 +43,8 @@
   --accent-dim: rgba(16,163,127,0.1);
   --accent-glow: rgba(16,163,127,0.2);
   --text-primary: #ececf1;
-  --text-secondary: #d1d5db;
-  --text-muted: #9ca3af;
+  --text-secondary: #e8ebf1;
+  --text-muted: #bbc4d2;
   --danger: #ff6b6b;
   --warning: #ffa500;
   --success: #10a37f;
@@ -607,93 +607,6 @@ body::before {
 .form-select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%235f6368' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
 .form-select:focus, .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
 .form-select option { background: #fff; color: var(--text-primary); }
-
-/* Country Dropdown in Modal */
-.country-dropdown-wrapper {
-  position: relative;
-}
-
-.country-dropdown-button {
-  width: 100%; padding: 11px 14px; background: var(--bg-primary);
-  border: 1px solid var(--border); border-radius: 10px;
-  color: var(--text-primary); font-size: 14px; font-family: inherit;
-  outline: none; transition: all 0.2s; cursor: pointer;
-  display: flex; align-items: center; justify-content: space-between;
-}
-
-.country-dropdown-button:hover {
-  border-color: var(--text-muted);
-}
-
-.country-dropdown-button:focus {
-  border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim);
-}
-
-.country-dropdown-button i {
-  font-size: 12px; transition: transform 0.2s;
-}
-
-.country-dropdown-button.active i {
-  transform: rotate(180deg);
-}
-
-.country-dropdown-menu {
-  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
-  background: var(--bg-primary); border: 1px solid var(--border);
-  border-radius: 10px; z-index: 10000;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-  display: none; max-height: 400px;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.country-dropdown-menu.active {
-  display: flex;
-}
-
-.country-search-box {
-  display: flex; align-items: center; gap: 10px;
-  padding: 12px 14px; border-bottom: 1px solid var(--border);
-  background: var(--bg-primary); flex-shrink: 0;
-  position: sticky; top: 0; z-index: 10;
-}
-
-.country-search-box i {
-  color: var(--text-muted); font-size: 14px; pointer-events: none;
-}
-
-.country-search-input {
-  flex: 1; background: none; border: none;
-  color: var(--text-primary); font-size: 13px;
-  outline: none; font-family: inherit;
-}
-
-.country-search-input::placeholder {
-  color: var(--text-muted);
-}
-
-.country-list {
-  overflow-y: auto; flex: 1;
-}
-
-.country-option {
-  padding: 12px 16px; background: none; border: none;
-  text-align: left; cursor: pointer; font-size: 14px;
-  color: var(--text-primary); transition: background 0.15s;
-  width: 100%; display: flex; align-items: center; gap: 10px;
-}
-
-.country-option:hover {
-  background: var(--bg-secondary);
-}
-
-.country-option.hidden {
-  display: none;
-}
-
-.country-option.selected {
-  background: var(--accent-dim); color: var(--accent); font-weight: 600;
-}
 
 .number-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
 .number-option {

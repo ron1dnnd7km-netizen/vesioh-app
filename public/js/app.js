@@ -190,16 +190,20 @@ function startDepositPolling() {
         var l = window.depositHistoryData[0];
         
         if (l.status === 'completed') {
-          showToast(t('Payment successful! Balance updated.'), 'success');
-          stopDepositPolling();
+          // Don't show toast multiple times
+          if (balanceRetryCount === 0) {
+            showToast(t('Payment successful! Balance updated.'), 'success');
+          }
           
-          // FIX: Keep refreshing balance for 30 more seconds after completed
+          // Keep refreshing balance for 30 more seconds after completed
           // Backend often marks deposit complete BEFORE actually crediting balance
           balanceRetryCount++;
           if (balanceRetryCount <= 6) {
-            loadBalance();
-            return; // Skip stopDepositPolling so we keep checking balance
+            // Continue polling - DON'T stop yet
+            return;
           }
+          
+          // After all retries, stop polling
           stopDepositPolling();
           if (window.currentPage === 'deposit') renderMainContent();
           return;
