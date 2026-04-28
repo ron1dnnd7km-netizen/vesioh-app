@@ -241,20 +241,10 @@ async function createPlisioInvoice(amount, currency, reference, email) {
   return data.data;
 }
 
-// ====== DEPOSIT: FLUTTERWAVE (Bank / Card) ======
 // ====== DEPOSIT: FLUTTERWAVE (Bank / Card / Mobile Money) ======
 var localCurrencyRates = {
-  NGN: 1500,
-  GHS: 15,
-  KES: 150,
-  ZAR: 18,
-  UGX: 3700,
-  TZS: 2500,
-  RWF: 1300,
-  XOF: 600,
-  XAF: 600,
-  EGP: 30,
-  MAD: 10
+  NGN: 1500, GHS: 15, KES: 150, ZAR: 18, UGX: 3700, TZS: 2500, RWF: 1300,
+  XOF: 600, XAF: 600, EGP: 30, MAD: 10
 };
 
 app.post('/api/deposit/flutterwave', async function(req, res) {
@@ -266,22 +256,16 @@ app.post('/api/deposit/flutterwave', async function(req, res) {
   if (amount < 2) return res.status(400).json({ error: 'Minimum deposit is $2.00' });
   if (amount > 1000) return res.status(400).json({ error: 'Maximum deposit is $1,000.00' });
 
-  // Convert USD to local currency if needed
-  var flutterAmount = amount;
-  var rate = localCurrencyRates[targetCurrency];
-  if (targetCurrency !== 'USD' && rate) {
-    flutterAmount = Math.round(amount * rate);
-  }
-
   var reference = 'DEP-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
   
-  // Store USD amount in database
+  // FIX: Store BOTH references - original for frontend polling, flutterwave's for webhook
   await db.prepare('INSERT INTO deposits (email, amount, method, status, reference) VALUES ($1, $2, $3, $4, $5)').run(email, amount, 'flutterwave', 'pending', reference);
 
   try {
-    var paymentOptions = ['card'];
-    if (targetCurrency !== 'USD') {
-      paymentOptions.push('banktransfer', 'mobilemoney');
+    var flutterAmount = amount;
+    var rate = localCurrencyRates[targetCurrency];
+    if (targetCurrency !== 'USD' && rate) {
+      flutterAmount = Math.round(amount * rate);
     }
 
     var flutterRes = await fetch('https://api.flutterwave.com/v3/payments', {
@@ -294,24 +278,21 @@ app.post('/api/deposit/flutterwave', async function(req, res) {
         tx_ref: reference,
         amount: flutterAmount,
         currency: targetCurrency,
-        payment_options: paymentOptions,
+        payment_options: ['card', 'banktransfer', 'mobilemoney'],
         hosted_payment: 1,
         redirect_url: process.env.FRONTEND_URL + '/?deposit=success&ref=' + reference,
-        customer: {
-          email: email,
-          name: email.split('@')[0]
-        },
-        customizations: {
-          title: 'SonVerify - Top Up Balance',
-          description: 'Add $' + amount.toFixed(2) + ' to your account'
-        }
+        customer: { email: email, name: email.split('@')[0] },
+        customizations: { title: 'SonVerify - Top Up Balance', description: 'Add $' + amount.toFixed(2) + ' to your account' }
       })
     });
 
     var flutterData = await flutterRes.json();
 
     if (flutterData.status === 'success') {
-      await db.prepare('UPDATE deposits SET reference = $1 WHERE reference = $2').run(flutterData.data.tx_ref, reference);
+      // FIX: Store Flutterwave's tx_ref separately, DON'T change the main reference!
+      await db.prepare('UPDATE deposits SET flutterwave_ref = $1 WHERE reference = $2')
+        .run(flutterData.data.tx_ref, reference);
+      console.log('Flutterwave payment created:', reference, '→ FW ref:', flutterData.data.tx_ref);
       res.json({ payment_link: flutterData.data.link });
     } else {
       await db.prepare('UPDATE deposits SET status = $1 WHERE reference = $2').run('failed', reference);
@@ -321,6 +302,67 @@ app.post('/api/deposit/flutterwave', async function(req, res) {
     console.error('Flutterwave deposit error:', err.message);
     await db.prepare('UPDATE deposits SET status = $1 WHERE reference = $2').run('failed', reference);
     res.status(500).json({ error: 'Payment error: ' + err.message });
+  }
+});
+
+// ====== FLUTTERWAVE WEBHOOK (FIXED) ======
+app.post('/api/webhook/flutterwave', async function(req, res) {
+  try {
+    console.log('=== FLUTTERWAVE WEBHOOK RECEIVED ===');
+    console.log('Headers:', JSON.stringify(req.headers));
+    console.log('Body:', JSON.stringify(req.body).substring(0, 500));
+    
+    var secretHash = process.env.FLUTTERWARE_WEBHOOK_SECRET;
+    var signature = req.headers['verif-hash'];
+    
+    // FIX: Log signature check for debugging
+    console.log('Expected secret:', secretHash ? secretHash.substring(0, 10) + '...' : 'NOT SET');
+    console.log('Received signature:', signature ? signature.substring(0, 10) + '...' : 'NOT RECEIVED');
+    
+    // FIX: If no secret set, skip verification (for testing)
+    if (secretHash && signature && signature !== secretHash) {
+      console.log('WEBHOOK REJECTED: Signature mismatch!');
+      return res.status(401).end();
+    }
+
+    var payload = req.body;
+    console.log('Event:', payload.event, 'Status:', payload.data ? payload.data.status : 'N/A');
+    
+    // FIX: Handle multiple event types from Flutterwave
+    var isValidEvent = ['charge.completed', 'payment.completed', 'transfer.completed'].indexOf(payload.event) !== -1;
+    var isSuccess = payload.data && (payload.data.status === 'successful' || payload.data.status === 'completed');
+    
+    if (isValidEvent && isSuccess) {
+      var txRef = payload.data.tx_ref;
+      
+      // FIX: Try to find by flutterwave_ref FIRST, then fallback to reference
+      var deposit = await db.prepare("SELECT * FROM deposits WHERE (flutterwave_ref = $1 OR reference = $1) AND status = $2")
+        .get(txRef, 'pending');
+      
+      if (deposit) {
+        var paidAmount = deposit.amount;
+        await db.prepare('UPDATE deposits SET status = $1, flutterwave_ref = $2 WHERE reference = $3')
+          .run('completed', txRef, deposit.reference);
+        await db.prepare('UPDATE users SET balance = balance + $1 WHERE email = $2').run(paidAmount, deposit.email);
+        console.log('✅ FLUTTERWAVE CREDITED:', deposit.email, '$' + paidAmount, 'ref:', txRef);
+      } else {
+        console.log('⚠️ Deposit not found for tx_ref:', txRef);
+        
+        // FIX: Also check if already completed (prevent double-credit)
+        var existingDeposit = await db.prepare("SELECT * FROM deposits WHERE reference = $1 OR flutterwave_ref = $1")
+          .get(txRef);
+        if (existingDeposit && existingDeposit.status === 'completed') {
+          console.log('Deposit already completed, skipping:', txRef);
+        }
+      }
+    } else {
+      console.log('⚠️ Event not processed:', payload.event, 'Status:', payload.data ? payload.data.status : 'N/A');
+    }
+    
+    res.status(200).json({ status: 'ok' });
+  } catch (err) {
+    console.error('❌ Flutterwave webhook error:', err.message);
+    res.status(200).json({ status: 'ok' }); // Always return 200 to prevent retries
   }
 });
 

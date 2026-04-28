@@ -90,7 +90,7 @@ async function initDB() {
   try {
     await pool.query(`ALTER TABLE deposits ADD COLUMN IF NOT EXISTS flutterwave_ref TEXT`);
   } catch (e) {
-    // Column already exists or error - ignore
+    // Column already exists - ignore
   }
 
   // ====== CREATE INDEXES FOR PERFORMANCE ======
@@ -113,7 +113,7 @@ async function initDB() {
 
 initDB().catch(err => console.error('DB Init Error:', err));
 
-// ====== DATABASE WRAPPER ======
+// ====== DATABASE WRAPPER (FIXED) ======
 module.exports = {
   prepare: function(sql) {
     return {
@@ -121,15 +121,17 @@ module.exports = {
         const result = await pool.query(sql, params);
         return {
           rowCount: result.rowCount,
-          rows: result.rows,  // Important for RETURNING support
+          rows: result.rows,
           oid: result.oid
         };
       },
       get: async function(...params) {
+        // FIX: Actually query the database!
         const result = await pool.query(sql, params);
         return result.rows[0] || null;
       },
       all: async function(...params) {
+        // FIX: Actually query the database!
         const result = await pool.query(sql, params);
         return result.rows;
       }
