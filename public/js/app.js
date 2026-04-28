@@ -149,78 +149,98 @@ var depositPollingInterval = null;
 function checkDepositReturn() {
   var p = new URLSearchParams(window.location.search);
   var s = p.get('deposit');
+  var ref = p.get('ref');
+  
+  // Clean URL
   if (s) window.history.replaceState({}, '', window.location.pathname);
   
+  // Load initial data
   Promise.all([loadBalance(), loadDepositHistory()]).then(function() {
-    if (s === 'success') {
+    if (s === 'success' && ref) {
       showToast(t('Payment submitted! Checking status...'), 'info');
-      startDepositPolling();
-    } else if (s === 'cancel') {
+      startDepositPollingByRef(ref);
+    } else if (s === 'cancel' || s === 'cancelled') {
       showToast(t('Payment was cancelled.'), 'error');
+    } else if (s === 'failed' || s === 'declined') {
+      showToast(t('Payment failed.'), 'error');
     } else {
-      checkForPendingDeposits();
+      // Check for any pending deposits in history
+      if (window.depositHistoryData && window.depositHistoryData.length > 0) {
+        var pendingDep = window.depositHistoryData.find(function(d) { return d.status === 'pending'; });
+        if (pendingDep && pendingDep.reference) {
+          startDepositPollingByRef(pendingDep.reference);
+        }
+      }
     }
   });
-  
-  // FIX: If returning from payment page, always refresh balance multiple times
-  // The backend may have credited the balance while user was on payment gateway page
-  if (s === 'success' || s === 'failed' || s === 'cancelled' || s === 'declined') {
-    var retryCount = 0;
-    (function keepRefreshingBalance() {
-      retryCount++;
-      if (retryCount > 6) return; // 6 * 5s = 30 seconds of extra balance checks
-      setTimeout(function() {
-        loadBalance();
-        keepRefreshingBalance();
-      }, 5000);
-    })();
-  }
 }
 
-function checkForPendingDeposits() { if (window.depositHistoryData && window.depositHistoryData.length > 0) { if (window.depositHistoryData[0].status === 'pending') startDepositPolling(); } }
-function startDepositPolling() {
+function startDepositPollingByRef(reference) {
   if (depositPollingInterval) clearInterval(depositPollingInterval);
+  
   var attempts = 0;
   var balanceRetryCount = 0;
+  var lastKnownStatus = null;
   
   depositPollingInterval = setInterval(function() {
     attempts++;
-    Promise.all([loadBalance(), loadDepositHistory()]).then(function() {
-      if (window.depositHistoryData && window.depositHistoryData.length > 0) {
-        var l = window.depositHistoryData[0];
+    
+    fetch('/api/deposit/status/' + reference)
+      .then(function(res) {
+        if (!res.ok) throw new Error('API error');
+        return res.json();
+      })
+      .then(function(data) {
+        lastKnownStatus = data.status;
         
-        if (l.status === 'completed') {
-          // Don't show toast multiple times
-          if (balanceRetryCount === 0) {
-            showToast(t('Payment successful! Balance updated.'), 'success');
-          }
-          
-          // Keep refreshing balance for 30 more seconds after completed
-          // Backend often marks deposit complete BEFORE actually crediting balance
-          balanceRetryCount++;
-          if (balanceRetryCount <= 6) {
-            // Continue polling - DON'T stop yet
-            return;
-          }
-          
-          // After all retries, stop polling
+        if (data.status === 'completed') {
+          showToast(t('Payment successful! Balance updated.'), 'success');
           stopDepositPolling();
+          
+          // Keep refreshing balance for 2 minutes (backend may delay balance credit)
+          balanceRetryCount = 0;
+          (function keepRefreshingBalance() {
+            balanceRetryCount++;
+            if (balanceRetryCount > 24) return;
+            setTimeout(function() {
+              loadBalance();
+              keepRefreshingBalance();
+            }, 5000);
+          })();
+          
+          // Reload deposit history
+          if (typeof loadDepositHistory === 'function') loadDepositHistory();
           if (window.currentPage === 'deposit') renderMainContent();
           return;
         }
         
-        if (l.status === 'failed' || l.status === 'cancelled') {
-          showToast(t('Payment failed or cancelled.'), 'error');
+        if (data.status === 'failed' || data.status === 'declined' || data.status === 'cancelled') {
+          var msg = data.status === 'declined' ? t('Payment was declined.') :
+                    data.status === 'cancelled' ? t('Payment was cancelled.') : t('Payment failed.');
+          showToast(msg, 'error');
           stopDepositPolling();
+          if (typeof loadDepositHistory === 'function') loadDepositHistory();
           if (window.currentPage === 'deposit') renderMainContent();
           return;
         }
-      }
-      if (attempts >= 24) {
-        stopDepositPolling();
-        showToast(t('Payment is still processing. It will update automatically.'), 'info');
-      }
-    });
+        
+        // Still pending - continue polling
+        if (attempts >= 36) { // 36 * 5s = 3 minutes
+          stopDepositPolling();
+          showToast(t('Payment is still processing. It will update automatically.'), 'info');
+          // Continue background polling less frequently
+          if (typeof startBackgroundPolling === 'function') {
+            startBackgroundPolling(reference);
+          }
+        }
+      })
+      .catch(function(err) {
+        console.error('Deposit status check error:', err);
+        if (attempts >= 36) {
+          stopDepositPolling();
+          showToast(t('Could not verify payment status. Please check deposit history.'), 'error');
+        }
+      });
   }, 5000);
 }
 
@@ -1095,3 +1115,4 @@ function updateThemeButton() {
     }
   }
 }
+

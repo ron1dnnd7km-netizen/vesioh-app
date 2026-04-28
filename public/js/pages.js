@@ -209,25 +209,26 @@ function getFlagFromPhone(phone, countryCode, country_code) {
           console.log('Deposit check #' + verifyAttempts + ':', data.status);
           
           if (data.status === 'completed') {
-  // SUCCESS! Show notification and refresh balance
-  if (typeof showToast === 'function') {
-    showToast('Payment confirmed! $' + (data.amount || '').toFixed(2) + ' added to your balance.', 'success');
-  }
-  
-  // FIX: Keep refreshing balance for 2 minutes after completion
-  // Backend may update deposit status before updating user balance
-  if (typeof loadBalance === 'function') {
-    loadBalance();
-    var extraPolls = 0;
-    (function keepPolling() {
-      extraPolls++;
-      if (extraPolls > 24) return; // 24 * 5s = 2 min
-      setTimeout(function() {
-        loadBalance();
-        keepPolling();
-      }, 5000);
-    })();
-  }
+            // FIX: Use (data.amount || 0) not (data.amount || '') - empty string has no toFixed()
+            var paidAmount = parseFloat(data.amount) || 0;
+            
+            if (typeof showToast === 'function') {
+              showToast('Payment confirmed! $' + paidAmount.toFixed(2) + ' added to your balance.', 'success');
+            }
+            
+            // Keep refreshing balance for 2 minutes after completion
+            if (typeof loadBalance === 'function') {
+              loadBalance();
+              var extraPolls = 0;
+              (function keepPolling() {
+                extraPolls++;
+                if (extraPolls > 24) return; // 24 * 5s = 2 min
+                setTimeout(function() {
+                  loadBalance();
+                  keepPolling();
+                }, 5000);
+              })();
+            }
             
             // Refresh deposit history
             setTimeout(function() {
@@ -241,7 +242,7 @@ function getFlagFromPhone(phone, countryCode, country_code) {
             return;
           }
           
-          // FIX: Also handle declined and cancelled statuses
+          // Handle declined and cancelled statuses
           if (data.status === 'failed' || data.status === 'declined' || data.status === 'cancelled') {
             var failMsg = data.status === 'declined' ? 'Payment was declined.' : 
                          data.status === 'cancelled' ? 'Payment was cancelled.' : 'Payment failed.';
@@ -278,7 +279,7 @@ function getFlagFromPhone(phone, countryCode, country_code) {
     setTimeout(checkDepositStatus, 2000);
   }
   
-  // FIX: Also handle declined and cancelled on direct URL return
+  // Handle declined and cancelled on direct URL return
   if (depositStatus === 'failed' || depositStatus === 'declined' || depositStatus === 'cancelled') {
     var directMsg = depositStatus === 'declined' ? 'Payment was declined.' : 
                     depositStatus === 'cancelled' ? 'Payment was cancelled.' : 'Payment failed.';
@@ -305,11 +306,14 @@ function startBackgroundPolling(reference) {
       .then(function(res) { return res.json(); })
       .then(function(data) {
         if (data.status === 'completed') {
+          // FIX: Parse amount correctly
+          var bgPaidAmount = parseFloat(data.amount) || 0;
+          
           if (typeof showToast === 'function') {
-            showToast('Payment confirmed! $' + (data.amount || '').toFixed(2) + ' added to your balance.', 'success');
+            showToast('Payment confirmed! $' + bgPaidAmount.toFixed(2) + ' added to your balance.', 'success');
           }
           
-          // FIX: Record when completed was first seen
+          // Record when completed was first seen
           if (!completedSeenAt) {
             completedSeenAt = Date.now();
             
@@ -317,9 +321,8 @@ function startBackgroundPolling(reference) {
             if (typeof loadBalance === 'function') loadBalance();
             
             // Keep refreshing balance every 5 seconds for 2 minutes
-            // This handles backend delay between status update and balance credit
             var balancePollCount = 0;
-            var balancePollMax = 24; // 24 * 5s = 2 minutes
+            var balancePollMax = 24;
             
             function keepRefreshingBalance() {
               balancePollCount++;
@@ -1034,25 +1037,6 @@ window.loadReferralHistory = async function() {
     if (!res.ok) return;
     var data = await res.json();
 
-    // --- Populate referral history ---
-    var referrals = data.referrals || data.referralHistory || [];
-    var histContainer = document.getElementById('refTabHistory');
-    if (histContainer) {
-      if (referrals.length === 0) {
-        histContainer.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">No referrals yet</div>';
-      } else {
-        histContainer.innerHTML = referrals.map(function(r) {
-          var dateStr = r.date || (r.created_at ? new Date(r.created_at).toLocaleDateString() : '—');
-          var email = r.email || r.referee || 'Unknown';
-          var earned = '$' + (r.earned || r.commission || 0).toFixed(2);
-          var status = r.status || 'Pending';
-          var statusColor = status === 'Paid' ? 'var(--accent)' : 'var(--warning)';
-          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;">' +
-            '<div><span style="color:var(--text-muted);">' + dateStr + '</span> — ' + email + '</div>' +
-            '<div style="font-weight:700;color:var(--accent);">' + earned + ' <span style="font-size:10px;color:' + statusColor + ';">(' + status + ')</span></div></div>';
-        }).join('');
-      }
-    }
 
     // --- Populate withdrawal history ---
     var withdrawals = data.withdrawals || data.withdrawalHistory || [];
@@ -1079,6 +1063,7 @@ window.loadReferralHistory = async function() {
 };
 
 // ====== REFERRAL PAGE RENDER ======
+
 async function renderSettingsPage(main) {
 
   // Render HTML skeleton FIRST (with empty placeholders)
@@ -1157,22 +1142,10 @@ async function renderSettingsPage(main) {
     '</div>';
 
   // --- NOW FETCH REAL DATA FROM BACKEND ---
-  var userEmail = getUserEmail();
-  if (!userEmail) {
-    console.log('Referral page: No user email found');
-    var linkEl = document.getElementById('referralLink');
-    if (linkEl) linkEl.textContent = 'Please log in to see your referral link';
-    return;
-  }
-
   try {
-    console.log('Fetching referral data for:', userEmail);
-    var res = await fetch('/api/user/' + userEmail);
-    if (!res.ok) {
-      throw new Error('Server returned ' + res.status);
-    }
+    var res = await fetch('/api/user/' + getUserEmail());
+    if (!res.ok) throw new Error('Unable to load referral data');
     var data = await res.json();
-    console.log('Referral data received:', data);
 
     // 1. Handle referral code
     var referralCode = data.refCode || data.referral_code || '';
@@ -1185,21 +1158,21 @@ async function renderSettingsPage(main) {
         var saveRes = await fetch('/api/user/refcode', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: userEmail, refCode: newCode })
+          body: JSON.stringify({ email: getUserEmail(), refCode: newCode })
         });
         var saveData = await saveRes.json();
 
         if (!saveData.error) {
           referralCode = newCode;
         } else {
-          console.error('Failed to save referral code:', saveData.error);
-          // FIX: Don't return early - use a fallback code for display
-          referralCode = newCode;
+          var linkEl = document.getElementById('referralLink');
+          if (linkEl) linkEl.textContent = 'Error generating code. Contact support.';
+          return;
         }
       } catch (e) {
-        console.error('Network error saving referral code:', e.message);
-        // FIX: Don't return early - use a fallback code for display
-        referralCode = newCode;
+        var linkEl2 = document.getElementById('referralLink');
+        if (linkEl2) linkEl2.textContent = 'Network error.';
+        return;
       }
     }
 
@@ -1220,16 +1193,30 @@ async function renderSettingsPage(main) {
 
     // 3. Populate history tabs from backend data
     // Referral history
+        // Referral history
     var referrals = data.referrals || data.referralHistory || [];
     var histContainer = document.getElementById('refTabHistory');
     if (histContainer) {
       if (referrals.length === 0) {
         histContainer.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">No referrals yet</div>';
       } else {
-        histContainer.innerHTML = referrals.map(function(r) {
+                histContainer.innerHTML = referrals.map(function(r) {
           var dateStr = r.date || (r.created_at ? new Date(r.created_at).toLocaleDateString() : '—');
           var email = r.email || r.referee || 'Unknown';
-          var earned = '$' + (r.earned || r.commission || 0).toFixed(2);
+          
+          // FIX: Handle earned field correctly
+          var earnedValue = 0;
+          if (r.earned !== undefined && r.earned !== null) {
+            if (typeof r.earned === 'string') {
+              earnedValue = parseFloat(r.earned.replace(/[^0-9.-]/g, '')) || 0;
+            } else {
+              earnedValue = parseFloat(r.earned) || 0;
+            }
+          } else if (r.commission !== undefined && r.commission !== null) {
+            earnedValue = parseFloat(r.commission) || 0;
+          }
+          var earned = '$' + earnedValue.toFixed(2);
+          
           var status = r.status || 'Pending';
           var statusColor = status === 'Paid' ? 'var(--accent)' : 'var(--warning)';
           return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;">' +
@@ -1259,17 +1246,9 @@ async function renderSettingsPage(main) {
       }
     }
 
-  } catch (err) {
-    console.error('Referral data load error:', err.message);
-    // Show error in the UI but don't break the page
-    var linkElErr = document.getElementById('referralLink');
-    if (linkElErr) linkElErr.textContent = 'Error loading data. Please refresh the page.';
-    
-    var histErr = document.getElementById('refTabHistory');
-    if (histErr) histErr.innerHTML = '<div style="text-align:center;padding:20px;color:var(--danger);">Failed to load data: ' + err.message + '</div>';
-    
-    var withdErr = document.getElementById('refTabWithdrawals');
-    if (withdErr) withdErr.innerHTML = '<div style="text-align:center;padding:20px;color:var(--danger);">Failed to load data</div>';
+    } catch (err) {
+    // Silent fail — page already shows default placeholder values
+    console.log('Referral data load error (non-critical):', err.message);
   }
 }
 
@@ -1984,3 +1963,4 @@ window.executeBuyNumber = function() {
     }
   });
 };
+
