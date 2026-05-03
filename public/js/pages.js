@@ -2047,3 +2047,20 @@ window.executeBuyNumber = function() {
     }
   });
 };
+
+// Add a hidden debug button (press Ctrl+Shift+D to show)
+document.addEventListener('keydown', function(e) {
+  if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+    var btn = document.getElementById('debugClearCache');
+    if (btn) {
+      btn.style.display = btn.style.display === 'none' ? 'block' : 'none';
+    } else {
+      var debugDiv = document.createElement('div');
+      debugDiv.id = 'debugClearCache';
+      debugDiv.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;background:#1a1a2e;padding:15px;border-radius:10px;border:1px solid #333;';
+      debugDiv.innerHTML = '<button onclick="clearAllPriceCache()" style="background:#e74c3c;color:white;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;font-size:14px;">Clear Price Cache</button><br><br>' +
+        '<button onclick="debugPrice(\'tg\',\'gb\')" style="background:#3498db;color:white;border:none;padding:10px 20px;border-radius:5px;cursor:pointer;font-size:14px;">Debug UK Telegram</button>';
+      document.body.appendChild(debugDiv);
+    }
+  }
+});

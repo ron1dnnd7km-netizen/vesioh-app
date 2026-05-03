@@ -1,3 +1,49 @@
+// ====== FIX: CLEAR STALE PRICE CACHE ======
+// Add this right after the priceCache declaration (around line 30)
+
+// Force clear cache if older than 1 hour (prevents stale prices)
+function checkCacheAge() {
+  try {
+    var cacheAge = localStorage.getItem('priceCacheAge');
+    var now = Date.now();
+    if (!cacheAge || (now - parseInt(cacheAge)) > 3600000) { // 1 hour
+      console.log('Clearing stale price cache...');
+      for (var key in priceCache) delete priceCache[key];
+      localStorage.removeItem('priceCache');
+      localStorage.setItem('priceCacheAge', now.toString());
+      return true;
+    }
+    return false;
+  } catch(e) { return false; }
+}
+
+// Auto-check cache age on load
+checkCacheAge();
+
+// ====== ADD DEBUG FUNCTION ======
+// Add this anywhere in data.js for testing
+window.debugPrice = function(serviceId, countryCode) {
+  console.log('=== PRICE DEBUG ===');
+  console.log('Service ID:', serviceId);
+  console.log('Country Code:', countryCode);
+  console.log('Cached prices for country:', priceCache[countryCode]);
+  console.log('Full cache:', priceCache);
+  
+  fetchPricesForCountry(countryCode).then(function(prices) {
+    console.log('Fresh API prices:', prices);
+    console.log('Price for', serviceId, ':', prices ? prices[serviceId] : 'NOT FOUND');
+  });
+};
+
+// Manual cache clear function
+window.clearAllPriceCache = function() {
+  for (var key in priceCache) delete priceCache[key];
+  localStorage.removeItem('priceCache');
+  localStorage.removeItem('priceCacheAge');
+  console.log('Price cache cleared!');
+  showToast('Price cache cleared! Please refresh the page.', 'success');
+};
+
 // ====== API PRICE ENGINE ======
 function addProfit(cost) {
   if (cost < 0.10) return Math.ceil((cost * 1.40) * 100) / 100;
@@ -34,23 +80,45 @@ try {
 } catch(e) {}
 
 function fetchPricesForCountry(countryCode) {
-  if (priceCache[countryCode]) return Promise.resolve(priceCache[countryCode]);
   var countryId = countryIdMap[countryCode];
-  if (!countryId) return Promise.resolve(null);
+  if (!countryId) {
+    console.warn('No country ID for:', countryCode);
+    return Promise.resolve(null);
+  }
+  
+  // ALWAYS fetch fresh prices (don't use cache for this call)
+  // Cache is only used for display, not for purchases
   return fetch(SMS_API_BASE + '/prices?token=' + SMS_API_TOKEN + '&country_id=' + countryId)
     .then(function(res) { return res.json(); })
     .then(function(json) {
-      if (json.code !== 200) return null;
+      if (json.code !== 200) {
+        console.error('Price API error:', json);
+        return null;
+      }
+      
       var prices = {};
+      var rawPrices = {};
+      
       for (var key in json.data) {
         var item = json.data[key];
-        prices[item.project_code] = addProfit(item.cost);
+        rawPrices[item.project_code] = item.cost;  // Store raw cost for debugging
+        prices[item.project_code] = addProfit(item.cost);  // Apply profit
       }
+      
+      console.log('Prices for', countryCode, '- Raw:', rawPrices, '- With profit:', prices);
+      
       priceCache[countryCode] = prices;
-      try { localStorage.setItem('priceCache', JSON.stringify(priceCache)); } catch(e) {}
+      try { 
+        localStorage.setItem('priceCache', JSON.stringify(priceCache)); 
+        localStorage.setItem('priceCacheAge', Date.now().toString());
+      } catch(e) {}
+      
       return prices;
     })
-    .catch(function(e) { console.error('Price fetch failed:', countryCode, e); return null; });
+    .catch(function(e) { 
+      console.error('Price fetch failed:', countryCode, e); 
+      return null; 
+    });
 }
 
 function getServicePrice(service, countryCode) {
