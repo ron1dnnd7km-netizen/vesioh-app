@@ -96,18 +96,45 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ====================================================================
 // ====== AUTH ======
+// ====================================================================
+
 app.post('/api/auth/signup', async function(req, res) {
   var email = req.body.email;
   var password = req.body.password;
+  var referralCode = req.body.referral;
+
   if (!email || !password) return res.status(400).json({ error: 'All fields are required' });
   if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
-  
+
   var existing = await db.prepare('SELECT email FROM users WHERE email = $1').get(email);
   if (existing) return res.status(400).json({ error: 'Email already registered' });
-  
+
   var hash = bcrypt.hashSync(password, 10);
-  await db.prepare('INSERT INTO users (email, password, balance) VALUES ($1, $2, DEFAULT)').run(email, hash);
+
+  // Generate a referral code for the new user immediately
+  var newUserRefCode = 'REF-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+
+  await db.prepare('INSERT INTO users (email, password, balance, referral_code) VALUES ($1, $2, DEFAULT, $3)').run(email, hash, newUserRefCode);
+
+  // Track referral if a code was provided in the signup payload
+  if (referralCode) {
+    try {
+      var referrer = await db.prepare('SELECT email FROM users WHERE referral_code = $1').get(referralCode);
+      if (referrer && referrer.email !== email) {
+        await db.prepare('UPDATE users SET referred_by = $1 WHERE email = $2').run(referrer.email, email);
+        console.log('[REFERRAL] User ' + email + ' referred by ' + referrer.email);
+      } else if (referrer && referrer.email === email) {
+        console.log('[REFERRAL] Self-referral blocked for ' + email);
+      } else {
+        console.log('[REFERRAL] Referral code not found: ' + referralCode);
+      }
+    } catch (err) {
+      console.error('[REFERRAL] Tracking error:', err.message);
+    }
+  }
+
   res.json({ email: email, message: 'Account created successfully.' });
 });
 
@@ -115,12 +142,12 @@ app.post('/api/auth/login', async function(req, res) {
   var email = req.body.email;
   var password = req.body.password;
   if (!email || !password) return res.status(400).json({ error: 'All fields are required' });
-  
+
   var user = await db.prepare('SELECT * FROM users WHERE email = $1').get(email);
   if (!user) return res.status(400).json({ error: 'Invalid email or password' });
   if (!user.password) return res.status(400).json({ error: 'This account has no password set' });
   if (!bcrypt.compareSync(password, user.password)) return res.status(400).json({ error: 'Invalid email or password' });
-  
+
   res.json({ email: user.email, name: user.name });
 });
 
@@ -129,25 +156,34 @@ app.post('/api/auth/forgot-password', function(req, res) {
   res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
 });
 
-// ====== USER ======
+// ====================================================================
+// ====== USER DATA (includes referral info) ======
+// ====================================================================
+
 app.get('/api/user/:email', async function(req, res) {
   try {
     var email = req.params.email;
     var user = await db.prepare('SELECT balance, referral_code FROM users WHERE email = $1').get(email);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
+    // Ensure referral code exists
     var referralCode = user.referral_code;
     if (!referralCode) {
       referralCode = 'REF-' + crypto.randomBytes(3).toString('hex').toUpperCase();
       await db.prepare('UPDATE users SET referral_code = $1 WHERE email = $2').run(referralCode, email);
     }
 
+    // Count total referred users
     var countResult = await db.prepare('SELECT COUNT(*) as total FROM users WHERE referred_by = $1').get(email);
     var totalReferrals = countResult ? parseInt(countResult.total) : 0;
 
-    var historyResult = await db.prepare("SELECT COALESCE(SUM(cost), 0) as total_spent FROM history WHERE email IN (SELECT email FROM users WHERE referred_by = $1) AND status = 'success'").get(email);
+    // Calculate total commissions (5% of all successful purchases by referred users)
+    var historyResult = await db.prepare(
+      "SELECT COALESCE(SUM(cost), 0) as total_spent FROM history WHERE email IN (SELECT email FROM users WHERE referred_by = $1) AND status = 'success'"
+    ).get(email);
     var totalCommissions = historyResult ? (parseFloat(historyResult.total_spent) * 0.05) : 0;
 
+    // Build referral history list
     var referrals = [];
     try {
       var referredUsers = await db.prepare('SELECT email, created_at FROM users WHERE referred_by = $1 ORDER BY created_at DESC').all(email);
@@ -158,28 +194,29 @@ app.get('/api/user/:email', async function(req, res) {
         var commission = spent * 0.05;
         referrals.push({
           email: refEmail,
-          earned: '$' + commission.toFixed(2),
+          earned: commission,
           status: commission > 0 ? 'Paid' : 'Pending',
           date: new Date(referredUsers[i].created_at).toLocaleDateString()
         });
       }
     } catch (e) {
-      console.log('Referrals skipped:', e.message);
+      console.log('Referrals query skipped:', e.message);
     }
 
+    // Build withdrawal history list
     var withdrawals = [];
     try {
       var wdRows = await db.prepare('SELECT method, amount, status, created_at FROM withdrawals WHERE email = $1 ORDER BY created_at DESC').all(email);
       withdrawals = wdRows.map(function(w) {
         return {
           method: w.method === 'crypto' ? 'Crypto' : w.method === 'giftcard' ? 'Gift Card' : w.method,
-          amount: '$' + parseFloat(w.amount).toFixed(2),
+          amount: parseFloat(w.amount),
           status: w.status.charAt(0).toUpperCase() + w.status.slice(1),
           date: new Date(w.created_at).toLocaleDateString()
         };
       });
     } catch (e) {
-      console.log('Withdrawals skipped:', e.message);
+      console.log('Withdrawals query skipped:', e.message);
     }
 
     res.json({
@@ -198,7 +235,8 @@ app.get('/api/user/:email', async function(req, res) {
 
 app.post('/api/user/refcode', async function(req, res) {
   try {
-    var { email, refCode } = req.body;
+    var email = req.body.email;
+    var refCode = req.body.refCode;
     if (!email || !refCode) return res.status(400).json({ error: 'Missing data' });
     var user = await db.prepare('SELECT referral_code FROM users WHERE email = $1').get(email);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -211,12 +249,14 @@ app.post('/api/user/refcode', async function(req, res) {
   }
 });
 
+// ====================================================================
 // ====== PLISIO HELPER ======
+// ====================================================================
+
 async function createPlisioInvoice(amount, currency, reference, email) {
   var apiKey = process.env.PLISIO_SECRET_KEY;
   if (!apiKey) throw new Error('Plisio API key not configured in .env');
 
-  // Use backend URL for callbacks (Plisio sends to your server, not user's browser)
   var backendUrl = process.env.BACKEND_URL || process.env.FRONTEND_URL;
 
   var params = new URLSearchParams({
@@ -227,7 +267,6 @@ async function createPlisioInvoice(amount, currency, reference, email) {
     currency: (currency || 'TRX').toUpperCase(),
     email: email,
     callback_url: backendUrl + '/api/deposit/plisio-callback?json=true',
-    // These URLs are correct - user is redirected here after payment
     success_invoice_url: process.env.FRONTEND_URL + '/?deposit=success&ref=' + reference,
     fail_invoice_url: process.env.FRONTEND_URL + '/?deposit=failed&ref=' + reference,
     api_key: apiKey
@@ -236,12 +275,15 @@ async function createPlisioInvoice(amount, currency, reference, email) {
   var response = await fetch('https://api.plisio.net/api/v1/invoices/new?' + params.toString(), { method: 'GET' });
   var data = await response.json();
 
-  if (data.status !== 'success') throw new Error(data.data?.message || 'Plisio error: ' + JSON.stringify(data));
+  if (data.status !== 'success') throw new Error(data.data && data.data.message ? data.data.message : 'Plisio error: ' + JSON.stringify(data));
   if (!data.data.invoice_url) throw new Error('No invoice URL returned from Plisio');
   return data.data;
 }
 
+// ====================================================================
 // ====== DEPOSIT: FLUTTERWAVE (Bank / Card / Mobile Money) ======
+// ====================================================================
+
 var localCurrencyRates = {
   NGN: 1500, GHS: 15, KES: 150, ZAR: 18, UGX: 3700, TZS: 2500, RWF: 1300,
   XOF: 600, XAF: 600, EGP: 30, MAD: 10
@@ -257,8 +299,7 @@ app.post('/api/deposit/flutterwave', async function(req, res) {
   if (amount > 1000) return res.status(400).json({ error: 'Maximum deposit is $1,000.00' });
 
   var reference = 'DEP-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-  
-  // FIX: Store BOTH references - original for frontend polling, flutterwave's for webhook
+
   await db.prepare('INSERT INTO deposits (email, amount, method, status, reference) VALUES ($1, $2, $3, $4, $5)').run(email, amount, 'flutterwave', 'pending', reference);
 
   try {
@@ -289,110 +330,79 @@ app.post('/api/deposit/flutterwave', async function(req, res) {
     var flutterData = await flutterRes.json();
 
     if (flutterData.status === 'success') {
-      // FIX: Store Flutterwave's tx_ref separately, DON'T change the main reference!
       await db.prepare('UPDATE deposits SET flutterwave_ref = $1 WHERE reference = $2')
         .run(flutterData.data.tx_ref, reference);
-      console.log('Flutterwave payment created:', reference, '→ FW ref:', flutterData.data.tx_ref);
+      console.log('[FLUTTERWAVE] Payment created:', reference, 'FW ref:', flutterData.data.tx_ref);
       res.json({ payment_link: flutterData.data.link });
     } else {
       await db.prepare('UPDATE deposits SET status = $1 WHERE reference = $2').run('failed', reference);
       res.status(500).json({ error: flutterData.message || 'Flutterwave error' });
     }
   } catch (err) {
-    console.error('Flutterwave deposit error:', err.message);
+    console.error('[FLUTTERWAVE] Deposit error:', err.message);
     await db.prepare('UPDATE deposits SET status = $1 WHERE reference = $2').run('failed', reference);
     res.status(500).json({ error: 'Payment error: ' + err.message });
   }
 });
 
-// ====== FLUTTERWAVE WEBHOOK (FIXED) ======
+// ====================================================================
+// ====== FLUTTERWAVE WEBHOOK (single, fixed version) ======
+// ====================================================================
+
 app.post('/api/webhook/flutterwave', async function(req, res) {
   try {
-    console.log('=== FLUTTERWAVE WEBHOOK RECEIVED ===');
-    console.log('Headers:', JSON.stringify(req.headers));
-    console.log('Body:', JSON.stringify(req.body).substring(0, 500));
-    
-    var secretHash = process.env.FLUTTERWARE_WEBHOOK_SECRET;
+    console.log('=== FLUTTERWAVE WEBHOOK ===');
+    console.log('Event:', req.body.event, 'Status:', req.body.data ? req.body.data.status : 'N/A');
+
+    var secretHash = process.env.FLUTTERWAVE_WEBHOOK_SECRET;
     var signature = req.headers['verif-hash'];
-    
-    // FIX: Log signature check for debugging
-    console.log('Expected secret:', secretHash ? secretHash.substring(0, 10) + '...' : 'NOT SET');
-    console.log('Received signature:', signature ? signature.substring(0, 10) + '...' : 'NOT RECEIVED');
-    
-    // FIX: If no secret set, skip verification (for testing)
+
+    // If a secret is configured, verify it; skip verification if not set (for testing)
     if (secretHash && signature && signature !== secretHash) {
-      console.log('WEBHOOK REJECTED: Signature mismatch!');
+      console.log('WEBHOOK REJECTED: Signature mismatch');
       return res.status(401).end();
     }
 
     var payload = req.body;
-    console.log('Event:', payload.event, 'Status:', payload.data ? payload.data.status : 'N/A');
-    
-    // FIX: Handle multiple event types from Flutterwave
-    var isValidEvent = ['charge.completed', 'payment.completed', 'transfer.completed'].indexOf(payload.event) !== -1;
+    var validEvents = ['charge.completed', 'payment.completed', 'transfer.completed'];
     var isSuccess = payload.data && (payload.data.status === 'successful' || payload.data.status === 'completed');
-    
-    if (isValidEvent && isSuccess) {
+
+    if (validEvents.indexOf(payload.event) !== -1 && isSuccess) {
       var txRef = payload.data.tx_ref;
-      
-      // FIX: Try to find by flutterwave_ref FIRST, then fallback to reference
-      var deposit = await db.prepare("SELECT * FROM deposits WHERE (flutterwave_ref = $1 OR reference = $1) AND status = $2")
-        .get(txRef, 'pending');
-      
+
+      // Look up by flutterwave_ref first, then by reference
+      var deposit = await db.prepare(
+        "SELECT * FROM deposits WHERE (flutterwave_ref = $1 OR reference = $1) AND status = 'pending'"
+      ).get(txRef);
+
       if (deposit) {
         var paidAmount = deposit.amount;
         await db.prepare('UPDATE deposits SET status = $1, flutterwave_ref = $2 WHERE reference = $3')
           .run('completed', txRef, deposit.reference);
         await db.prepare('UPDATE users SET balance = balance + $1 WHERE email = $2').run(paidAmount, deposit.email);
-        console.log('✅ FLUTTERWAVE CREDITED:', deposit.email, '$' + paidAmount, 'ref:', txRef);
+        console.log('CREDITED via Flutterwave:', deposit.email, '$' + paidAmount, 'ref:', txRef);
       } else {
-        console.log('⚠️ Deposit not found for tx_ref:', txRef);
-        
-        // FIX: Also check if already completed (prevent double-credit)
-        var existingDeposit = await db.prepare("SELECT * FROM deposits WHERE reference = $1 OR flutterwave_ref = $1")
-          .get(txRef);
-        if (existingDeposit && existingDeposit.status === 'completed') {
-          console.log('Deposit already completed, skipping:', txRef);
+        // Check if already completed to prevent double-credit logging
+        var existing = await db.prepare("SELECT status FROM deposits WHERE reference = $1 OR flutterwave_ref = $1").get(txRef);
+        if (existing && existing.status === 'completed') {
+          console.log('Already completed, skipping:', txRef);
+        } else {
+          console.log('Deposit not found for tx_ref:', txRef);
         }
       }
-    } else {
-      console.log('⚠️ Event not processed:', payload.event, 'Status:', payload.data ? payload.data.status : 'N/A');
     }
-    
-    res.status(200).json({ status: 'ok' });
-  } catch (err) {
-    console.error('❌ Flutterwave webhook error:', err.message);
-    res.status(200).json({ status: 'ok' }); // Always return 200 to prevent retries
-  }
-});
 
-// ====== FLUTTERWAVE WEBHOOK ======
-app.post('/api/webhook/flutterwave', async function(req, res) {
-  try {
-    var secretHash = process.env.FLUTTERWAVE_WEBHOOK_SECRET;
-    var signature = req.headers['verif-hash'];
-    if (signature !== secretHash) return res.status(401).end();
-
-    var payload = req.body;
-    if (payload.event === 'charge.completed' && payload.data.status === 'successful') {
-      var txRef = payload.data.tx_ref;
-      var deposit = await db.prepare('SELECT * FROM deposits WHERE reference = $1 AND status = $2').get(txRef, 'pending');
-
-      if (deposit) {
-        // Credit the USD amount stored in database, not the local currency
-        var paidAmount = deposit.amount;
-        await db.prepare('UPDATE deposits SET status = $1 WHERE reference = $2').run('completed', txRef);
-        await db.prepare('UPDATE users SET balance = balance + $1 WHERE email = $2').run(paidAmount, deposit.email);
-        console.log('Flutterwave credited:', deposit.email, '$' + paidAmount);
-      }
-    }
     res.status(200).json({ status: 'ok' });
   } catch (err) {
     console.error('Flutterwave webhook error:', err.message);
-    res.status(500).end();
+    res.status(200).json({ status: 'ok' });
   }
 });
+
+// ====================================================================
 // ====== DEPOSIT: PLISIO (Crypto) ======
+// ====================================================================
+
 app.post('/api/deposit/plisio', async function(req, res) {
   var email = req.body.email;
   var amount = req.body.amount;
@@ -403,7 +413,7 @@ app.post('/api/deposit/plisio', async function(req, res) {
   if (amount > 1000) return res.status(400).json({ error: 'Maximum deposit is $1,000.00' });
 
   var reference = 'DEP-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-  
+
   await db.prepare('INSERT INTO deposits (email, amount, method, status, reference, pay_currency) VALUES ($1, $2, $3, $4, $5, $6)').run(email, amount, 'crypto', 'pending', reference, payCurrency);
 
   try {
@@ -416,7 +426,6 @@ app.post('/api/deposit/plisio', async function(req, res) {
   }
 });
 
-// ====== PLISIO CALLBACK ======
 app.post('/api/deposit/plisio-callback', async function(req, res) {
   try {
     var status = req.body.status;
@@ -424,24 +433,27 @@ app.post('/api/deposit/plisio-callback', async function(req, res) {
     console.log('Plisio callback: status=' + status + ' order=' + orderId);
 
     if (status === 'completed') {
-      var deposit = await db.prepare('SELECT * FROM deposits WHERE reference = $1 AND status = $2').get(orderId, 'pending');
+      var deposit = await db.prepare("SELECT * FROM deposits WHERE reference = $1 AND status = 'pending'").get(orderId);
       if (deposit) {
         var creditAmount = parseFloat(req.body.source_amount) || deposit.amount;
-        await db.prepare('UPDATE deposits SET status = $1 WHERE reference = $2').run('completed', orderId);
+        await db.prepare("UPDATE deposits SET status = 'completed' WHERE reference = $1").run(orderId);
         await db.prepare('UPDATE users SET balance = balance + $1 WHERE email = $2').run(creditAmount, deposit.email);
-        console.log('Credited: ' + orderId + ' $' + creditAmount + ' -> ' + deposit.email);
+        console.log('Credited via Plisio:', orderId, '$' + creditAmount, '->', deposit.email);
       }
     } else if (status === 'expired' || status === 'cancelled') {
-      await db.prepare('UPDATE deposits SET status = $1 WHERE reference = $2 AND status = $3').run('failed', orderId, 'pending');
+      await db.prepare("UPDATE deposits SET status = 'failed' WHERE reference = $1 AND status = 'pending'").run(orderId);
     }
     res.json({ status: 'ok' });
   } catch (err) {
-    console.error('Callback error:', err.message);
+    console.error('Plisio callback error:', err.message);
     res.status(200).json({ status: 'ok' });
   }
 });
 
+// ====================================================================
 // ====== NUMBERS ======
+// ====================================================================
+
 app.get('/api/numbers/:email', async function(req, res) {
   var rows = await db.prepare('SELECT * FROM numbers WHERE email = $1 ORDER BY created_at DESC').all(req.params.email);
   res.json(rows);
@@ -486,11 +498,13 @@ app.post('/api/numbers/request', async function(req, res) {
   }
 
   await db.prepare('UPDATE users SET balance = balance - $1 WHERE email = $2').run(cost, email);
-  
-  var insertResult = await db.prepare('INSERT INTO numbers (email, service_name, service_id, phone, status, time_left, total_time, cost, provider_request_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id').run(email, serviceName, serviceId, realPhone, 'waiting', 600, 600, cost, providerRequestId);
+
+  var insertResult = await db.prepare(
+    'INSERT INTO numbers (email, service_name, service_id, phone, status, time_left, total_time, cost, provider_request_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id'
+  ).run(email, serviceName, serviceId, realPhone, 'waiting', 600, 600, cost, providerRequestId);
   var numberId = insertResult.rows[0].id;
 
-  await db.prepare('INSERT INTO history (email, service_name, phone, code, status, cost) VALUES ($1, $2, $3, NULL, $4, $5)').run(email, serviceName, realPhone, 'pending', cost);
+  await db.prepare("INSERT INTO history (email, service_name, phone, code, status, cost) VALUES ($1, $2, $3, NULL, 'pending', $4)").run(email, serviceName, realPhone, cost);
 
   if (useRealProvider && providerRequestId) {
     startPolling(numberId, providerRequestId, serviceName);
@@ -502,31 +516,27 @@ app.post('/api/numbers/request', async function(req, res) {
 function startPolling(numberId, providerRequestId, serviceName) {
   var provider = require('./sms-provider');
   var attempts = 0;
-  console.log("[POLL START] Starting polling for Number ID:", numberId, "Provider ID:", providerRequestId);
-  
+  console.log("[POLL] Starting for Number ID:", numberId, "Provider ID:", providerRequestId);
+
   var interval = setInterval(async function() {
     attempts++;
     try {
-      console.log("[POLL CHECK " + attempts + "] Checking provider for ID:", providerRequestId);
       var result = await provider.checkCode(providerRequestId);
-      console.log("[POLL RESULT] Got result:", JSON.stringify(result));
-      
+
       if (result.success && result.code) {
         clearInterval(interval);
         var smsText = 'Your ' + serviceName + ' verification code is ' + result.code + '. Do not share it with anyone.';
         await db.prepare('UPDATE numbers SET status = $1, code = $2, sms_text = $3 WHERE id = $4').run('received', result.code, smsText, numberId);
-        await db.prepare('INSERT INTO history (email, service_name, phone, code, status, cost) SELECT email, service_name, phone, $1, $2, cost FROM numbers WHERE id = $3').run(result.code, 'success', numberId);
+        await db.prepare("INSERT INTO history (email, service_name, phone, code, status, cost) SELECT email, service_name, phone, $1, $2, cost FROM numbers WHERE id = $3").run(result.code, 'success', numberId);
         provider.complete(providerRequestId).catch(function() {});
       }
       if (result.success === false && result.waiting === false) {
-        console.log("[POLL STOP] Provider said no longer waiting.");
         clearInterval(interval);
       }
     } catch (err) {
-      console.error('[POLL ERROR] Error checking code for ' + numberId + ':', err.message);
+      console.error('[POLL ERROR]', numberId + ':', err.message);
     }
     if (attempts >= 120) {
-      console.log("[POLL STOP] Max attempts reached.");
       clearInterval(interval);
     }
   }, 5000);
@@ -536,14 +546,14 @@ app.delete('/api/numbers/:id', async function(req, res) {
   var num = await db.prepare('SELECT * FROM numbers WHERE id = $1').get(req.params.id);
   if (!num) return res.status(404).json({ error: 'Number not found' });
   if (num.status !== 'waiting') return res.status(400).json({ error: 'Can only cancel waiting numbers' });
-  
+
   if (num.provider_request_id) {
     try { var provider = require('./sms-provider'); await provider.cancel(num.provider_request_id); } catch (err) { console.error('Cancel error:', err.message); }
   }
-  
+
   await db.prepare('UPDATE users SET balance = balance + $1 WHERE email = $2').run(num.cost, num.email);
   await db.prepare('DELETE FROM numbers WHERE id = $1').run(req.params.id);
-  
+
   var user = await db.prepare('SELECT balance FROM users WHERE email = $1').get(num.email);
   res.json({ message: 'Cancelled and refunded', balance: user.balance });
 });
@@ -551,11 +561,11 @@ app.delete('/api/numbers/:id', async function(req, res) {
 app.post('/api/numbers/:id/expire', async function(req, res) {
   var num = await db.prepare('SELECT * FROM numbers WHERE id = $1').get(req.params.id);
   if (!num) return res.status(404).json({ error: 'Number not found' });
-  
+
   await db.prepare('UPDATE users SET balance = balance + $1 WHERE email = $2').run(num.cost, num.email);
-  await db.prepare('UPDATE numbers SET status = $1, time_left = 0 WHERE id = $2').run('expired', req.params.id);
-  await db.prepare('INSERT INTO history (email, service_name, phone, code, status, cost) VALUES ($1, $2, $3, NULL, $4, $5)').run(num.email, num.service_name, num.phone, 'failed', num.cost);
-  
+  await db.prepare("UPDATE numbers SET status = 'expired', time_left = 0 WHERE id = $1").run(req.params.id);
+  await db.prepare("INSERT INTO history (email, service_name, phone, code, status, cost) VALUES ($1, $2, $3, NULL, 'failed', $4)").run(num.email, num.service_name, num.phone, num.cost);
+
   var user = await db.prepare('SELECT balance FROM users WHERE email = $1').get(num.email);
   res.json({ balance: user.balance });
 });
@@ -563,60 +573,85 @@ app.post('/api/numbers/:id/expire', async function(req, res) {
 app.post('/api/numbers/:id/receive', async function(req, res) {
   var code = req.body.code;
   var smsText = req.body.smsText;
-  var num = await db.prepare('SELECT * FROM numbers WHERE id = $1 AND status = $2').get(req.params.id, 'waiting');
+  var num = await db.prepare("SELECT * FROM numbers WHERE id = $1 AND status = 'waiting'").get(req.params.id);
   if (!num) return res.status(404).json({ error: 'Number not found or not waiting' });
-  
+
   await db.prepare('UPDATE numbers SET status = $1, code = $2, sms_text = $3 WHERE id = $4').run('received', code, smsText, req.params.id);
-  await db.prepare('INSERT INTO history (email, service_name, phone, code, status, cost) VALUES ($1, $2, $3, $4, $5, $6)').run(num.email, num.service_name, num.phone, code, 'success', num.cost);
-  
+  await db.prepare("INSERT INTO history (email, service_name, phone, code, status, cost) VALUES ($1, $2, $3, $4, 'success', $5)").run(num.email, num.service_name, num.phone, code, num.cost);
+
   res.json({ message: 'Code received', code: code });
 });
 
+// ====================================================================
 // ====== HISTORY ======
+// ====================================================================
+
 app.get('/api/history/:email', async function(req, res) {
   var rows = await db.prepare('SELECT * FROM history WHERE email = $1 ORDER BY created_at DESC').all(req.params.email);
   res.json(rows);
 });
 
 app.post('/api/simulate/:id', async function(req, res) {
-  var num = await db.prepare('SELECT * FROM numbers WHERE id = $1 AND status = $2').get(req.params.id, 'waiting');
+  var num = await db.prepare("SELECT * FROM numbers WHERE id = $1 AND status = 'waiting'").get(req.params.id);
   if (!num) return res.json({ message: 'No waiting number found' });
-  
+
   var code = String(Math.floor(100000 + Math.random() * 900000));
   var smsText = 'Your ' + num.service_name + ' verification code is ' + code + '. Do not share it with anyone.';
-  
+
   await db.prepare('UPDATE numbers SET status = $1, code = $2, sms_text = $3 WHERE id = $4').run('received', code, smsText, num.id);
-  await db.prepare('INSERT INTO history (email, service_name, phone, code, status, cost) VALUES ($1, $2, $3, $4, $5, $6)').run(num.email, num.service_name, num.phone, code, 'success', num.cost);
-  
+  await db.prepare("INSERT INTO history (email, service_name, phone, code, status, cost) VALUES ($1, $2, $3, $4, 'success', $5)").run(num.email, num.service_name, num.phone, code, num.cost);
+
   res.json({ message: 'Simulated SMS received', code: code, phone: num.phone, service: num.service_name });
 });
 
+// ====================================================================
 // ====== DEPOSITS HISTORY ======
+// ====================================================================
+
 app.get('/api/deposits/:email', async function(req, res) {
   var rows = await db.prepare('SELECT * FROM deposits WHERE email = $1 ORDER BY created_at DESC').all(req.params.email);
   res.json(rows);
 });
 
+// ====================================================================
+// ====== DEPOSIT STATUS CHECK (frontend polling) ======
+// ====================================================================
+
+app.get('/api/deposit/status/:reference', async function(req, res) {
+  try {
+    var deposit = await db.prepare('SELECT * FROM deposits WHERE reference = $1').get(req.params.reference);
+    if (!deposit) return res.status(404).json({ error: 'Deposit not found' });
+    res.json({
+      status: deposit.status,
+      amount: parseFloat(deposit.amount),
+      method: deposit.method
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ====================================================================
 // ====== REFERRAL SYSTEM ======
+// ====================================================================
+
 app.get('/api/referral/code/:email', async function(req, res) {
   var user = await db.prepare('SELECT referral_code FROM users WHERE email = $1').get(req.params.email);
   if (!user) return res.status(404).json({ error: 'User not found' });
-  
+
   var code = user.referral_code;
   if (!code) {
     code = 'REF-' + crypto.randomBytes(3).toString('hex').toUpperCase();
     await db.prepare('UPDATE users SET referral_code = $1 WHERE email = $2').run(code, req.params.email);
   }
-  
+
   var frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-  res.json({ 
-    code: code, 
-    link: frontendUrl + '/?ref=' + code 
-  });
+  res.json({ code: code, link: frontendUrl + '/?ref=' + code });
 });
 
 app.post('/api/referral/track', async function(req, res) {
-  var { referrerEmail, referredEmail } = req.body;
+  var referrerEmail = req.body.referrerEmail;
+  var referredEmail = req.body.referredEmail;
   if (!referrerEmail || !referredEmail) return res.status(400).json({ error: 'Missing data' });
   if (referrerEmail === referredEmail) return res.status(400).json({ error: 'Cannot refer yourself' });
 
@@ -631,15 +666,17 @@ app.post('/api/referral/track', async function(req, res) {
 
 app.get('/api/referral/stats/:email', async function(req, res) {
   var email = req.params.email;
-  
+
   var countResult = await db.prepare('SELECT COUNT(*) as total FROM users WHERE referred_by = $1').get(email);
   var totalReferrals = countResult ? countResult.total : 0;
-  
-  var historyResult = await db.prepare("SELECT COALESCE(SUM(cost), 0) as total_spent FROM history WHERE email IN (SELECT email FROM users WHERE referred_by = $1) AND status = 'success'").get(email);
+
+  var historyResult = await db.prepare(
+    "SELECT COALESCE(SUM(cost), 0) as total_spent FROM history WHERE email IN (SELECT email FROM users WHERE referred_by = $1) AND status = 'success'"
+  ).get(email);
   var totalEarnings = historyResult ? (historyResult.total_spent * 0.05) : 0;
-  
+
   var referredUsers = await db.prepare('SELECT email, created_at FROM users WHERE referred_by = $1 ORDER BY created_at DESC').all(email);
-  
+
   res.json({
     totalReferrals: totalReferrals,
     totalEarnings: totalEarnings.toFixed(2),
@@ -647,7 +684,10 @@ app.get('/api/referral/stats/:email', async function(req, res) {
   });
 });
 
+// ====================================================================
 // ====== WITHDRAWAL REQUEST ======
+// ====================================================================
+
 app.post('/api/withdraw', async function(req, res) {
   try {
     var email = req.body.email;
@@ -662,9 +702,13 @@ app.post('/api/withdraw', async function(req, res) {
       return res.status(400).json({ error: 'Minimum withdrawal is $1.00' });
     }
 
-    var historyResult = await db.prepare("SELECT COALESCE(SUM(cost), 0) as total_spent FROM history WHERE email IN (SELECT email FROM users WHERE referred_by = $1) AND status = 'success'").get(email);
+    // Calculate available commissions
+    var historyResult = await db.prepare(
+      "SELECT COALESCE(SUM(cost), 0) as total_spent FROM history WHERE email IN (SELECT email FROM users WHERE referred_by = $1) AND status = 'success'"
+    ).get(email);
     var totalCommissions = historyResult ? (parseFloat(historyResult.total_spent) * 0.05) : 0;
 
+    // Subtract already-withdrawn amounts
     var withdrawnResult = await db.prepare("SELECT COALESCE(SUM(amount), 0) as total FROM withdrawals WHERE email = $1 AND status != 'rejected'").get(email);
     var alreadyWithdrawn = withdrawnResult ? parseFloat(withdrawnResult.total) : 0;
     var available = totalCommissions - alreadyWithdrawn;
@@ -673,7 +717,7 @@ app.post('/api/withdraw', async function(req, res) {
       return res.status(400).json({ error: 'Insufficient commission balance. Available: $' + available.toFixed(2) });
     }
 
-    await db.prepare('INSERT INTO withdrawals (email, method, address, amount, status) VALUES ($1, $2, $3, $4, $5)').run(email, method, address, amount, 'pending');
+    await db.prepare("INSERT INTO withdrawals (email, method, address, amount, status) VALUES ($1, $2, $3, $4, 'pending')").run(email, method, address, amount);
 
     res.json({ success: true, message: 'Withdrawal request submitted' });
   } catch (err) {
@@ -682,9 +726,12 @@ app.post('/api/withdraw', async function(req, res) {
   }
 });
 
+// ====================================================================
 // ====== ADMIN AUTH ======
+// ====================================================================
+
 var ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'SonVerify2025';
-console.log('ADMIN_PASSWORD is:', ADMIN_PASSWORD);
+console.log('Admin password is set.');
 
 app.post('/api/admin/login', function(req, res) {
   if (req.body.password === ADMIN_PASSWORD) {
@@ -702,7 +749,10 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+// ====================================================================
 // ====== ADMIN: DASHBOARD STATS ======
+// ====================================================================
+
 app.get('/api/admin/stats', requireAdmin, async function(req, res) {
   try {
     var userCount = await db.prepare('SELECT COUNT(*) as total FROM users').get();
@@ -729,7 +779,10 @@ app.get('/api/admin/stats', requireAdmin, async function(req, res) {
   }
 });
 
+// ====================================================================
 // ====== ADMIN: ALL USERS ======
+// ====================================================================
+
 app.get('/api/admin/users', requireAdmin, async function(req, res) {
   try {
     var search = req.query.search || '';
@@ -737,11 +790,11 @@ app.get('/api/admin/users', requireAdmin, async function(req, res) {
     var limit = 20;
     var offset = (page - 1) * limit;
 
-    var whereClause = search ? "WHERE email ILIKE $" + 1 + " OR referral_code ILIKE $" + 1 : "";
+    var whereClause = search ? "WHERE email ILIKE $1 OR referral_code ILIKE $1" : "";
     var params = search ? ['%' + search + '%'] : [];
 
-    var countResult = await db.prepare('SELECT COUNT(*) as total FROM users ' + whereClause).get(...params);
-    var users = await db.prepare('SELECT email, balance, referral_code, referred_by, created_at FROM users ' + whereClause + ' ORDER BY created_at DESC LIMIT ' + limit + ' OFFSET ' + offset).all(...params);
+    var countResult = await db.prepare('SELECT COUNT(*) as total FROM users ' + whereClause).get.apply(db, [whereClause, params].flat());
+    var users = await db.prepare('SELECT email, balance, referral_code, referred_by, created_at FROM users ' + whereClause + ' ORDER BY created_at DESC LIMIT ' + limit + ' OFFSET ' + offset).all.apply(db, params);
 
     var enriched = [];
     for (var i = 0; i < users.length; i++) {
@@ -769,7 +822,10 @@ app.get('/api/admin/users', requireAdmin, async function(req, res) {
   }
 });
 
+// ====================================================================
 // ====== ADMIN: SINGLE USER DETAIL ======
+// ====================================================================
+
 app.get('/api/admin/user/:email', requireAdmin, async function(req, res) {
   try {
     var email = req.params.email;
@@ -795,12 +851,14 @@ app.get('/api/admin/user/:email', requireAdmin, async function(req, res) {
   }
 });
 
+// ====================================================================
 // ====== ADMIN: ADJUST USER BALANCE ======
+// ====================================================================
+
 app.post('/api/admin/user/:email/balance', requireAdmin, async function(req, res) {
   try {
     var email = req.params.email;
     var amount = parseFloat(req.body.amount);
-    var reason = req.body.reason || 'Admin adjustment';
 
     if (isNaN(amount)) return res.status(400).json({ error: 'Invalid amount' });
 
@@ -816,7 +874,10 @@ app.post('/api/admin/user/:email/balance', requireAdmin, async function(req, res
   }
 });
 
+// ====================================================================
 // ====== ADMIN: ALL WITHDRAWALS ======
+// ====================================================================
+
 app.get('/api/admin/withdrawals', requireAdmin, async function(req, res) {
   try {
     var status = req.query.status || '';
@@ -827,10 +888,10 @@ app.get('/api/admin/withdrawals', requireAdmin, async function(req, res) {
     var whereClause = status ? "WHERE w.status = $1" : "";
     var params = status ? [status] : [];
 
-    var countResult = await db.prepare('SELECT COUNT(*) as total FROM withdrawals w ' + whereClause).get(...params);
+    var countResult = await db.prepare('SELECT COUNT(*) as total FROM withdrawals w ' + whereClause).get.apply(db, params);
     var rows = await db.prepare(
       'SELECT w.*, u.balance as user_balance FROM withdrawals w LEFT JOIN users u ON w.email = u.email ' + whereClause + ' ORDER BY w.created_at DESC LIMIT ' + limit + ' OFFSET ' + offset
-    ).all(...params);
+    ).all.apply(db, params);
 
     res.json({
       withdrawals: rows,
@@ -842,12 +903,14 @@ app.get('/api/admin/withdrawals', requireAdmin, async function(req, res) {
   }
 });
 
+// ====================================================================
 // ====== ADMIN: APPROVE / REJECT WITHDRAWAL ======
+// ====================================================================
+
 app.post('/api/admin/withdrawal/:id', requireAdmin, async function(req, res) {
   try {
     var id = req.params.id;
     var action = req.body.action;
-    var adminNote = req.body.note || '';
 
     if (action !== 'approve' && action !== 'reject') {
       return res.status(400).json({ error: 'Action must be approve or reject' });
@@ -866,7 +929,10 @@ app.post('/api/admin/withdrawal/:id', requireAdmin, async function(req, res) {
   }
 });
 
+// ====================================================================
 // ====== ADMIN: ALL DEPOSITS ======
+// ====================================================================
+
 app.get('/api/admin/deposits', requireAdmin, async function(req, res) {
   try {
     var status = req.query.status || '';
@@ -877,8 +943,8 @@ app.get('/api/admin/deposits', requireAdmin, async function(req, res) {
     var whereClause = status ? "WHERE status = $1" : "";
     var params = status ? [status] : [];
 
-    var countResult = await db.prepare('SELECT COUNT(*) as total FROM deposits ' + whereClause).get(...params);
-    var rows = await db.prepare('SELECT * FROM deposits ' + whereClause + ' ORDER BY created_at DESC LIMIT ' + limit + ' OFFSET ' + offset).all(...params);
+    var countResult = await db.prepare('SELECT COUNT(*) as total FROM deposits ' + whereClause).get.apply(db, params);
+    var rows = await db.prepare('SELECT * FROM deposits ' + whereClause + ' ORDER BY created_at DESC LIMIT ' + limit + ' OFFSET ' + offset).all.apply(db, params);
 
     res.json({
       deposits: rows,
@@ -890,7 +956,10 @@ app.get('/api/admin/deposits', requireAdmin, async function(req, res) {
   }
 });
 
+// ====================================================================
 // ====== ADMIN: ALL NUMBERS ======
+// ====================================================================
+
 app.get('/api/admin/numbers', requireAdmin, async function(req, res) {
   try {
     var status = req.query.status || '';
@@ -901,8 +970,8 @@ app.get('/api/admin/numbers', requireAdmin, async function(req, res) {
     var whereClause = status ? "WHERE status = $1" : "";
     var params = status ? [status] : [];
 
-    var countResult = await db.prepare('SELECT COUNT(*) as total FROM numbers ' + whereClause).get(...params);
-    var rows = await db.prepare('SELECT * FROM numbers ' + whereClause + ' ORDER BY created_at DESC LIMIT ' + limit + ' OFFSET ' + offset).all(...params);
+    var countResult = await db.prepare('SELECT COUNT(*) as total FROM numbers ' + whereClause).get.apply(db, params);
+    var rows = await db.prepare('SELECT * FROM numbers ' + whereClause + ' ORDER BY created_at DESC LIMIT ' + limit + ' OFFSET ' + offset).all.apply(db, params);
 
     res.json({
       numbers: rows,
@@ -914,7 +983,10 @@ app.get('/api/admin/numbers', requireAdmin, async function(req, res) {
   }
 });
 
+// ====================================================================
 // ====== ADMIN: DELETE USER ======
+// ====================================================================
+
 app.delete('/api/admin/user/:email', requireAdmin, async function(req, res) {
   try {
     var email = req.params.email;
@@ -929,30 +1001,16 @@ app.delete('/api/admin/user/:email', requireAdmin, async function(req, res) {
   }
 });
 
-// ====== DEPOSIT STATUS CHECK (for frontend polling) ======
-app.get('/api/deposit/status/:reference', async function(req, res) {
-  try {
-    var reference = req.params.reference;
-    var deposit = await db.prepare('SELECT * FROM deposits WHERE reference = $1').get(reference);
-    if (!deposit) return res.status(404).json({ error: 'Deposit not found' });
-    res.json({
-      status: deposit.status,
-      amount: parseFloat(deposit.amount),
-      method: deposit.method
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
+// ====================================================================
 // ====== PRICES BY COUNTRY ======
+// ====================================================================
+
 app.get('/api/prices/:countryCode', async function(req, res) {
   try {
     var countryCode = req.params.countryCode;
     var country = countries.find(function(c) { return c.code === countryCode; });
     var baseMultiplier = country ? (country.basePrice / 0.50) : 1;
-    
-    // Return prices adjusted by country
+
     var prices = {};
     if (typeof services !== 'undefined') {
       services.forEach(function(s) {
@@ -965,27 +1023,36 @@ app.get('/api/prices/:countryCode', async function(req, res) {
   }
 });
 
-// ====== TEST ROUTE (remove after debugging) ======
+// ====================================================================
+// ====== TEST ROUTE ======
+// ====================================================================
+
 app.get('/api/test', function(req, res) {
-  res.json({ 
-    status: 'ok', 
-    message: 'Server is running the latest code',
+  res.json({
+    status: 'ok',
+    message: 'Server is running',
     timestamp: new Date().toISOString()
   });
 });
 
+// ====================================================================
 // ====== CATCH-ALL ======
+// ====================================================================
+
 app.use(function(req, res, next) {
   if (req.path.startsWith('/api')) return res.status(404).json({ error: 'API route not found' });
   if (req.path.includes('.')) return res.status(404).send('File not found');
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// ====================================================================
 // ====== AUTO-LOAD SMS PROVIDER MAPS ON STARTUP ======
+// ====================================================================
+
 async function loadProviderMaps() {
   try {
     var provider = require('./sms-provider');
-    
+
     var cRes = await fetch('https://sms-bus.com/api/control/list/countries?token=' + process.env.SMS_API_KEY);
     var cData = await cRes.json();
     var countryMap = {};
@@ -1001,15 +1068,19 @@ async function loadProviderMaps() {
     }
 
     provider.setMaps(serviceMap, countryMap);
+    console.log('Provider maps loaded. Services:', Object.keys(serviceMap).length, 'Countries:', Object.keys(countryMap).length);
   } catch (err) {
-    console.error('Failed to auto-load provider maps. Error:', err.message);
+    console.error('Failed to auto-load provider maps:', err.message);
   }
 }
 
 loadProviderMaps();
 
-// ====== START ======
-var PORT = process.env.PORT || 3000;
+// ====================================================================
+// ====== START SERVER ======
+// ====================================================================
+
+var PORT = process.env.PORT || 3001;
 var server = app.listen(PORT, function() {
   console.log('Server started on port ' + PORT);
 });

@@ -1,3 +1,14 @@
+// Add this near the top of page.js
+function maskEmail(email) {
+  if (!email) return 'Unknown';
+  var parts = email.split('@');
+  if (parts.length !== 2) return '***';
+  var name = parts[0];
+  var domain = parts[1];
+  var maskedName = name.substring(0, 2) + '***';
+  return maskedName + '@' + domain;
+}
+
 // ===== MISSING HELPER FUNCTIONS =====
 
 // Safe get user email
@@ -1218,16 +1229,14 @@ async function renderSettingsPage(main) {
     var countEl = document.getElementById('refCount');
     if (countEl) countEl.textContent = (data.referralCount || data.refCount || 0);
 
-    // 3. Populate history tabs from backend data
-    // Referral history
-        // Referral history
+        // 3. Populate history tabs from backend data
     var referrals = data.referrals || data.referralHistory || [];
     var histContainer = document.getElementById('refTabHistory');
     if (histContainer) {
       if (referrals.length === 0) {
         histContainer.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">No referrals yet</div>';
       } else {
-                histContainer.innerHTML = referrals.map(function(r) {
+        histContainer.innerHTML = referrals.map(function(r) {
           var dateStr = r.date || (r.created_at ? new Date(r.created_at).toLocaleDateString() : '—');
           var email = r.email || r.referee || 'Unknown';
           
@@ -1246,14 +1255,16 @@ async function renderSettingsPage(main) {
           
           var status = r.status || 'Pending';
           var statusColor = status === 'Paid' ? 'var(--accent)' : 'var(--warning)';
+          
+          // ✅ Masked email so users can't see the full address
           return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;">' +
-            '<div><span style="color:var(--text-muted);">' + dateStr + '</span> — ' + email + '</div>' +
+            '<div><span style="color:var(--text-muted);">' + dateStr + '</span> — ' + maskEmail(email) + '</div>' +
             '<div style="font-weight:700;color:var(--accent);">' + earned + ' <span style="font-size:10px;color:' + statusColor + ';">(' + status + ')</span></div></div>';
         }).join('');
       }
     }
 
-    // Withdrawal history
+    // Withdrawal history (make sure this is still below it)
     var withdrawals = data.withdrawals || data.withdrawalHistory || [];
     var withdContainer = document.getElementById('refTabWithdrawals');
     if (withdContainer) {
@@ -1273,7 +1284,7 @@ async function renderSettingsPage(main) {
       }
     }
 
-    } catch (err) {
+  } catch (err) {
     // Silent fail — page already shows default placeholder values
     console.log('Referral data load error (non-critical):', err.message);
   }
@@ -2064,3 +2075,4 @@ document.addEventListener('keydown', function(e) {
     }
   }
 });
+
