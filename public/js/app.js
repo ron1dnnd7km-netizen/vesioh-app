@@ -337,7 +337,7 @@ var translations = {
 
     // === REFERRAL PAGE (NEW) ===
     'Recommend the service and earn money':'Recommend the service and earn money',
-    'Share your referral link and earn 5% commission on every purchase':'Share your referral link and earn 5% commission on every purchase',
+    'Share your referral link and earn 10% commission on every purchase':'Share your referral link and earn 10% commission on every purchase',
     'Read more...':'Read more...',
     'TOTAL COMMISSIONS':'TOTAL COMMISSIONS',
     'Lifetime earnings':'Lifetime earnings',
@@ -367,7 +367,7 @@ var translations = {
     'Referral earnings':'Referral earnings','Total referrals':'Total referrals',
     'Share your link':'Share your link',
     'commission':'commission','purchase':'purchase',
-    'earn 5%':'earn 5%','5% commission':'5% commission',
+    'earn 5%':'earn 10%','5% commission':'10% commission',
 
     // === CONTACTS PAGE ===
     'Contact Us':'Contact Us','Get in Touch':'Get in Touch',

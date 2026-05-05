@@ -581,22 +581,22 @@ async function loadReferrals() {
   var main = document.getElementById('mainContent');
   main.innerHTML = '<div class="empty">Loading...</div>';
   try {
-    var data = await api('/api/admin/users?search=&page=1');
-    var refUsers = data.users.filter(function(u) { return u.referral_count > 0; }).sort(function(a, b) { return b.referral_count - a.referral_count; });
+    var data = await api('/api/admin/referrals');
+    var refUsers = data.referrers || [];
+    
     main.innerHTML =
       '<div class="table-wrap">' +
-        '<div class="table-header"><h2>Top Referrers (' + refUsers.length + ' users with referrals)</h2></div>' +
+        '<div class="table-header"><h2>🏆 Top Referrers (' + refUsers.length + ' users with referrals)</h2></div>' +
         (refUsers.length === 0 ? '<div class="empty">No referral activity yet</div>' :
-        '<div style="overflow-x:auto;"><table><thead><tr><th>Rank</th><th>Email</th><th>Ref Code</th><th>Referrals</th><th class="hide-mobile">Total Spent</th><th class="hide-mobile">Est. Commission</th><th>Actions</th></tr></thead><tbody>' +
+        '<div style="overflow-x:auto;"><table><thead><tr><th>Rank</th><th>Email</th><th>Ref Code</th><th>Referrals</th><th class="hide-mobile">Spent by Referrals</th><th class="hide-mobile">Commission Earned</th><th>Actions</th></tr></thead><tbody>' +
         refUsers.map(function(u, i) {
-          var estCommission = u.total_spent * 0.05;
           return '<tr>' +
             '<td><strong>#' + (i + 1) + '</strong></td>' +
             '<td><strong>' + u.email + '</strong></td>' +
             '<td style="font-family:monospace;font-size:12px;color:var(--accent);">' + (u.referral_code || '') + '</td>' +
             '<td><strong>' + u.referral_count + '</strong></td>' +
-            '<td class="hide-mobile">' + fmtMoney(u.total_spent) + '</td>' +
-            '<td class="hide-mobile" style="color:var(--accent);font-weight:700;">' + fmtMoney(estCommission) + '</td>' +
+            '<td class="hide-mobile">' + fmtMoney(u.total_spent_by_referrals) + '</td>' +
+            '<td class="hide-mobile" style="color:var(--accent);font-weight:700;">' + fmtMoney(u.commission_earned) + '</td>' +
             '<td><button class="action-btn btn-view" onclick="viewUser(\'' + u.email + '\')">View</button></td>' +
           '</tr>';
         }).join('') +

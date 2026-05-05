@@ -177,11 +177,11 @@ app.get('/api/user/:email', async function(req, res) {
     var countResult = await db.prepare('SELECT COUNT(*) as total FROM users WHERE referred_by = $1').get(email);
     var totalReferrals = countResult ? parseInt(countResult.total) : 0;
 
-    // Calculate total commissions (5% of all successful purchases by referred users)
+    // Calculate total commissions (10% of all successful purchases by referred users)
     var historyResult = await db.prepare(
       "SELECT COALESCE(SUM(cost), 0) as total_spent FROM history WHERE email IN (SELECT email FROM users WHERE referred_by = $1) AND status = 'success'"
     ).get(email);
-    var totalCommissions = historyResult ? (parseFloat(historyResult.total_spent) * 0.05) : 0;
+    var totalCommissions = historyResult ? (parseFloat(historyResult.total_spent) * 0.10) : 0;
 
     // Build referral history list
     var referrals = [];
@@ -191,7 +191,7 @@ app.get('/api/user/:email', async function(req, res) {
         var refEmail = referredUsers[i].email;
         var spentResult = await db.prepare("SELECT COALESCE(SUM(cost), 0) as total FROM history WHERE email = $1 AND status = 'success'").get(refEmail);
         var spent = spentResult ? parseFloat(spentResult.total) : 0;
-        var commission = spent * 0.05;
+        var commission = spent * 0.10;
         referrals.push({
           email: refEmail,
           earned: commission,
@@ -706,7 +706,7 @@ app.post('/api/withdraw', async function(req, res) {
     var historyResult = await db.prepare(
       "SELECT COALESCE(SUM(cost), 0) as total_spent FROM history WHERE email IN (SELECT email FROM users WHERE referred_by = $1) AND status = 'success'"
     ).get(email);
-    var totalCommissions = historyResult ? (parseFloat(historyResult.total_spent) * 0.05) : 0;
+    var totalCommissions = historyResult ? (parseFloat(historyResult.total_spent) * 0.10) : 0;
 
     // Subtract already-withdrawn amounts
     var withdrawnResult = await db.prepare("SELECT COALESCE(SUM(amount), 0) as total FROM withdrawals WHERE email = $1 AND status != 'rejected'").get(email);
@@ -771,7 +771,7 @@ app.get('/api/admin/stats', requireAdmin, async function(req, res) {
       todayDeposits: parseFloat(todayDeposits.total),
       totalDeposits: parseFloat(totalDeposits.total),
       pendingWithdrawals: parseInt(pendingWithdrawals.total),
-      totalCommissions: parseFloat(totalCommissions.total) * 0.05,
+      totalCommissions: parseFloat(totalCommissions.total) * 0.10,
       totalReferrals: parseInt(referralCount.total)
     });
   } catch (err) {
@@ -780,7 +780,7 @@ app.get('/api/admin/stats', requireAdmin, async function(req, res) {
 });
 
 // ====================================================================
-// ====== ADMIN: ALL USERS ======
+// ====== ADMIN: ALL USERS (FIXED) ======
 // ====================================================================
 
 app.get('/api/admin/users', requireAdmin, async function(req, res) {
@@ -790,11 +790,19 @@ app.get('/api/admin/users', requireAdmin, async function(req, res) {
     var limit = 20;
     var offset = (page - 1) * limit;
 
-    var whereClause = search ? "WHERE email ILIKE $1 OR referral_code ILIKE $1" : "";
-    var params = search ? ['%' + search + '%'] : [];
+    var whereClause = '';
+    var params = [];
 
-    var countResult = await db.prepare('SELECT COUNT(*) as total FROM users ' + whereClause).get.apply(db, [whereClause, params].flat());
-    var users = await db.prepare('SELECT email, balance, referral_code, referred_by, created_at FROM users ' + whereClause + ' ORDER BY created_at DESC LIMIT ' + limit + ' OFFSET ' + offset).all.apply(db, params);
+    if (search) {
+      whereClause = "WHERE email ILIKE $1 OR referral_code ILIKE $1";
+      params = ['%' + search + '%'];
+    }
+
+    var countQuery = 'SELECT COUNT(*) as total FROM users ' + whereClause;
+    var countResult = await db.prepare(countQuery).get.apply(db, params);
+    
+    var dataQuery = 'SELECT email, balance, referral_code, referred_by, created_at FROM users ' + whereClause + ' ORDER BY created_at DESC LIMIT ' + limit + ' OFFSET ' + offset;
+    var users = await db.prepare(dataQuery).all.apply(db, params);
 
     var enriched = [];
     for (var i = 0; i < users.length; i++) {
@@ -818,6 +826,7 @@ app.get('/api/admin/users', requireAdmin, async function(req, res) {
       pages: Math.ceil(parseInt(countResult.total) / limit)
     });
   } catch (err) {
+    console.error('Admin users error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -875,7 +884,7 @@ app.post('/api/admin/user/:email/balance', requireAdmin, async function(req, res
 });
 
 // ====================================================================
-// ====== ADMIN: ALL WITHDRAWALS ======
+// ====== ADMIN: ALL WITHDRAWALS (FIXED) ======
 // ====================================================================
 
 app.get('/api/admin/withdrawals', requireAdmin, async function(req, res) {
@@ -885,13 +894,19 @@ app.get('/api/admin/withdrawals', requireAdmin, async function(req, res) {
     var limit = 20;
     var offset = (page - 1) * limit;
 
-    var whereClause = status ? "WHERE w.status = $1" : "";
-    var params = status ? [status] : [];
+    var whereClause = '';
+    var params = [];
 
-    var countResult = await db.prepare('SELECT COUNT(*) as total FROM withdrawals w ' + whereClause).get.apply(db, params);
-    var rows = await db.prepare(
-      'SELECT w.*, u.balance as user_balance FROM withdrawals w LEFT JOIN users u ON w.email = u.email ' + whereClause + ' ORDER BY w.created_at DESC LIMIT ' + limit + ' OFFSET ' + offset
-    ).all.apply(db, params);
+    if (status) {
+      whereClause = "WHERE w.status = $1";
+      params = [status];
+    }
+
+    var countQuery = 'SELECT COUNT(*) as total FROM withdrawals w ' + whereClause;
+    var countResult = await db.prepare(countQuery).get.apply(db, params);
+
+    var dataQuery = 'SELECT w.*, u.balance as user_balance FROM withdrawals w LEFT JOIN users u ON w.email = u.email ' + whereClause + ' ORDER BY w.created_at DESC LIMIT ' + limit + ' OFFSET ' + offset;
+    var rows = await db.prepare(dataQuery).all.apply(db, params);
 
     res.json({
       withdrawals: rows,
@@ -899,6 +914,7 @@ app.get('/api/admin/withdrawals', requireAdmin, async function(req, res) {
       pages: Math.ceil(parseInt(countResult.total) / limit)
     });
   } catch (err) {
+    console.error('Admin withdrawals error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -930,7 +946,7 @@ app.post('/api/admin/withdrawal/:id', requireAdmin, async function(req, res) {
 });
 
 // ====================================================================
-// ====== ADMIN: ALL DEPOSITS ======
+// ====== ADMIN: ALL DEPOSITS (FIXED) ======
 // ====================================================================
 
 app.get('/api/admin/deposits', requireAdmin, async function(req, res) {
@@ -940,11 +956,19 @@ app.get('/api/admin/deposits', requireAdmin, async function(req, res) {
     var limit = 20;
     var offset = (page - 1) * limit;
 
-    var whereClause = status ? "WHERE status = $1" : "";
-    var params = status ? [status] : [];
+    var whereClause = '';
+    var params = [];
 
-    var countResult = await db.prepare('SELECT COUNT(*) as total FROM deposits ' + whereClause).get.apply(db, params);
-    var rows = await db.prepare('SELECT * FROM deposits ' + whereClause + ' ORDER BY created_at DESC LIMIT ' + limit + ' OFFSET ' + offset).all.apply(db, params);
+    if (status) {
+      whereClause = "WHERE status = $1";
+      params = [status];
+    }
+
+    var countQuery = 'SELECT COUNT(*) as total FROM deposits ' + whereClause;
+    var countResult = await db.prepare(countQuery).get.apply(db, params);
+
+    var dataQuery = 'SELECT * FROM deposits ' + whereClause + ' ORDER BY created_at DESC LIMIT ' + limit + ' OFFSET ' + offset;
+    var rows = await db.prepare(dataQuery).all.apply(db, params);
 
     res.json({
       deposits: rows,
@@ -952,12 +976,13 @@ app.get('/api/admin/deposits', requireAdmin, async function(req, res) {
       pages: Math.ceil(parseInt(countResult.total) / limit)
     });
   } catch (err) {
+    console.error('Admin deposits error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
 // ====================================================================
-// ====== ADMIN: ALL NUMBERS ======
+// ====== ADMIN: ALL NUMBERS (FIXED) ======
 // ====================================================================
 
 app.get('/api/admin/numbers', requireAdmin, async function(req, res) {
@@ -967,11 +992,19 @@ app.get('/api/admin/numbers', requireAdmin, async function(req, res) {
     var limit = 20;
     var offset = (page - 1) * limit;
 
-    var whereClause = status ? "WHERE status = $1" : "";
-    var params = status ? [status] : [];
+    var whereClause = '';
+    var params = [];
 
-    var countResult = await db.prepare('SELECT COUNT(*) as total FROM numbers ' + whereClause).get.apply(db, params);
-    var rows = await db.prepare('SELECT * FROM numbers ' + whereClause + ' ORDER BY created_at DESC LIMIT ' + limit + ' OFFSET ' + offset).all.apply(db, params);
+    if (status) {
+      whereClause = "WHERE status = $1";
+      params = [status];
+    }
+
+    var countQuery = 'SELECT COUNT(*) as total FROM numbers ' + whereClause;
+    var countResult = await db.prepare(countQuery).get.apply(db, params);
+
+    var dataQuery = 'SELECT * FROM numbers ' + whereClause + ' ORDER BY created_at DESC LIMIT ' + limit + ' OFFSET ' + offset;
+    var rows = await db.prepare(dataQuery).all.apply(db, params);
 
     res.json({
       numbers: rows,
@@ -979,6 +1012,7 @@ app.get('/api/admin/numbers', requireAdmin, async function(req, res) {
       pages: Math.ceil(parseInt(countResult.total) / limit)
     });
   } catch (err) {
+    console.error('Admin numbers error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -1034,6 +1068,62 @@ app.get('/api/test', function(req, res) {
     timestamp: new Date().toISOString()
   });
 });
+
+// ====================================================================
+// ====== ADMIN: ALL REFERRALS (FIXED) ======
+// ====================================================================
+
+app.get('/api/admin/referrals', requireAdmin, async function(req, res) {
+  try {
+    // Get ALL users who have referred someone
+    var referrers = await db.prepare(
+      "SELECT u.email, u.referral_code, COUNT(r.email) as referral_count " +
+      "FROM users u " +
+      "JOIN users r ON r.referred_by = u.email " +
+      "GROUP BY u.email, u.referral_code " +
+      "ORDER BY referral_count DESC"
+    ).all();
+
+    var enriched = [];
+    for (var i = 0; i < referrers.length; i++) {
+      var refEmail = referrers[i].email;
+      
+      // Calculate total spent by ALL users this person referred
+      var spentResult = await db.prepare(
+        "SELECT COALESCE(SUM(cost), 0) as total_spent " +
+        "FROM history " +
+        "WHERE email IN (SELECT email FROM users WHERE referred_by = $1) " +
+        "AND status = 'success'"
+      ).get(refEmail);
+      
+      var totalSpentByReferrals = spentResult ? parseFloat(spentResult.total_spent) : 0;
+      var commissionEarned = totalSpentByReferrals * 0.10;
+      
+      // Get list of referred users
+      var referredList = await db.prepare(
+        "SELECT email, created_at FROM users WHERE referred_by = $1 ORDER BY created_at DESC"
+      ).all(refEmail);
+      
+      enriched.push({
+        email: refEmail,
+        referral_code: referrers[i].referral_code,
+        referral_count: parseInt(referrers[i].referral_count),
+        total_spent_by_referrals: totalSpentByReferrals,
+        commission_earned: commissionEarned,
+        referred_users: referredList
+      });
+    }
+
+    res.json({
+      referrers: enriched,
+      total: enriched.length
+    });
+  } catch (err) {
+    console.error('Admin referrals error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // ====================================================================
 // ====== CATCH-ALL ======
