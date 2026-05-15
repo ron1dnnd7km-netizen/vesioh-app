@@ -456,7 +456,6 @@ const countries = [
   { code: 'au', name: 'Australia', flag: '🇦🇺', prefix: '+61', basePrice: 0.90 },
   { code: 'it', name: 'Italy', flag: '🇮🇹', prefix: '+39', basePrice: 0.60 },
   { code: 'es', name: 'Spain', flag: '🇪🇸', prefix: '+34', basePrice: 0.55 },
-  { code: 'usv', name: 'United States (Virtual)', flag: '🇺🇸', prefix: '+1', basePrice: 0.50 }, 
   { code: 'sa', name: 'Saudi Arabia', flag: '🇸🇦', prefix: '+966', basePrice: 1.20 },
   { code: 'ae', name: 'United Arab Emirates', flag: '🇦🇪', prefix: '+971', basePrice: 1.50 },
   { code: 'il', name: 'Israel', flag: '🇮🇱', prefix: '+972', basePrice: 1.00 },
